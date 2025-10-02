@@ -2,25 +2,32 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Yandex v3 test</title>
+  <title>Yandex Maps v3 test</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    html,body,#map {height:100%; margin:0; padding:0;}
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
   </style>
 </head>
 <body>
-<div id="map"></div>
-<script type="module">
-  import { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } 
-    from "https://api-maps.yandex.ru/v3/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU";
+  <div id="map"></div>
 
-  const map = new YMap(
-    document.getElementById('map'),
-    { location: { center: [37.618423, 55.751244], zoom: 5 } }
-  );
+  <script type="module">
+    import { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } 
+      from "https://api-maps.yandex.ru/v3/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU";
 
-  map.addChild(new YMapDefaultSchemeLayer());
-  map.addChild(new YMapDefaultFeaturesLayer());
-</script>
+    // создаём карту, центр на Москву
+    const map = new YMap(
+      document.getElementById('map'),
+      { location: { center: [37.618423, 55.751244], zoom: 5 } }
+    );
+
+    // схема и базовые фичи
+    map.addChild(new YMapDefaultSchemeLayer());
+    map.addChild(new YMapDefaultFeaturesLayer());
+  </script>
 </body>
 </html>
