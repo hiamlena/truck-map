@@ -1,33 +1,14 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <title>Yandex Maps v3 test</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-
-  <script type="module">
-    import { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } 
-      from "https://api-maps.yandex.ru/v3/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU";
-
-    // создаём карту, центр на Москву
-    const map = new YMap(
-      document.getElementById('map'),
-      { location: { center: [37.618423, 55.751244], zoom: 5 } }
-    );
-
-    // схема и базовые фичи
-    map.addChild(new YMapDefaultSchemeLayer());
-    map.addChild(new YMapDefaultFeaturesLayer());
-  </script>
-</body>
-</html>
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yandex Maps v2.1 — smoke test</title>
+<style>html,body,#map{height:100%;margin:0}</style>
+<script src="https://api-maps.yandex.ru/2.1/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU"></script>
+</head><body>
+<div id="map"></div>
+<script>
+ymaps.ready(function(){
+  var map = new ymaps.Map('map', {center:[55.751244,37.618423], zoom:5});
+  map.controls.add('zoomControl');
+});
+</script>
+</body></html>
