@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"id": "wf_1", "name": "Весовая рамка", "radius_m": 500, "note": "пример"},
+      "geometry": {"type": "Point", "coordinates": [37.62, 55.75]}
+    }
+  ]
+}
