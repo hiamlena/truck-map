@@ -1,1 +1,80 @@
-<!DOCTYPE html><html><body><h1>Index replacement</h1></body></html>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Карта для большегрузов — Яндекс визуал + OSRM маршрутизация</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin:0; padding:0; height:100%; }
+    #map { width:100%; height:100%; }
+    #panel { position:absolute; top:10px; left:10px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.3); font-family:sans-serif; }
+    input { margin:4px 0; width:200px; padding:6px; }
+    button { margin:4px 0; padding:6px 10px; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <div><input id="from" placeholder="Откуда (адрес или lat,lon)" /></div>
+  <div><input id="to" placeholder="Куда (адрес или lat,lon)" /></div>
+  <div>
+    <button id="routeBtn">Маршрут</button>
+    <button id="detourBtn">ИИ-объезд</button>
+  </div>
+</div>
+
+<script type="module">
+  import {YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapFeature, YMapCollection}
+    from "https://api-maps.yandex.ru/v3/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU";
+
+  // --- Карта ---
+  const map = new YMap(document.getElementById('map'), {
+    location: {center:[37.618423,55.751244], zoom:5}
+  });
+  map.addChild(new YMapDefaultSchemeLayer());
+  map.addChild(new YMapDefaultFeaturesLayer());
+
+  let routeLine = null;
+
+  // --- Вспомогательные функции ---
+  function parseLatLon(s){
+    const m=String(s).trim().match(/(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)/);
+    if(m) return [parseFloat(m[1]), parseFloat(m[3])]; // lat, lon
+    return null;
+  }
+  async function geocode(q){
+    const ll=parseLatLon(q);
+    if(ll) return ll;
+    const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
+    const r=await fetch(url,{headers:{'Accept-Language':'ru'}});
+    const js=await r.json();
+    if(!js.length) throw new Error("Адрес не найден");
+    return [parseFloat(js[0].lat), parseFloat(js[0].lon)];
+  }
+  async function buildRoute(points){
+    const coords = points.map(p=>p.reverse().join(',')).join(';'); // lon,lat
+    const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+    const r=await fetch(url); const js=await r.json();
+    if(!js.routes?.length) return alert("Маршрут не найден");
+    const rt=js.routes[0].geometry.coordinates; // [lon,lat]
+    const coordsLL=rt.map(([lon,lat])=>[lon,lat]);
+    if(routeLine) routeLine.remove();
+    routeLine=new YMapFeature({
+      geometry:{type:"LineString", coordinates:coordsLL},
+      style:{stroke:[{color:"#0066ff",width:4}]}
+    });
+    map.addChild(routeLine);
+  }
+
+  // --- Обработчики ---
+  document.getElementById('routeBtn').onclick=async()=>{
+    const a=await geocode(document.getElementById('from').value);
+    const b=await geocode(document.getElementById('to').value);
+    await buildRoute([a,b]);
+  };
+  document.getElementById('detourBtn').onclick=()=>{
+    alert("ИИ-объезд (demo): здесь будет логика объезда весовых рамок и Платона");
+  };
+</script>
+</body>
+</html>
