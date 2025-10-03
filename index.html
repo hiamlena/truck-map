@@ -18,9 +18,364 @@
       --border: rgba(15, 23, 42, 0.08);
     }
 
-    /* ... остальной CSS ... (оптимизирован как в патче, но не изменён здесь для краткости) ... */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: var(--font);
+      background: #f3f4f8;
+      color: #0f172a;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      position: relative;
+      min-height: 100dvh;
+      overflow: hidden;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 1100;
+      background: var(--panel-bg);
+      box-shadow: var(--shadow);
+      border-radius: 18px;
+      padding: 16px 18px;
+      backdrop-filter: blur(18px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #recommendations {
+      top: calc(16px + env(safe-area-inset-top));
+      left: 16px;
+      width: min(360px, calc(100vw - 32px));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+
+    #recommendations.hidden {
+      transform: translateY(-24px);
+    }
+
+    #recommendations h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    #recommendationsList {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    #legend {
+      top: calc(16px + env(safe-area-inset-top));
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 200px;
+      font-size: 14px;
+    }
+
+    #legend.hidden {
+      transform: translateY(-24px);
+    }
+
+    #legend h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .legend-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+    }
+
+    .legend-icon.red { background: var(--danger); }
+    .legend-icon.orange { background: var(--warning); }
+    .legend-line {
+      width: 24px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1200;
+      background: var(--sheet-bg);
+      border-radius: 26px 26px 0 0;
+      box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.35);
+      padding: 20px 20px calc(28px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: 65dvh;
+      transition: transform 0.35s ease;
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+    }
+
+    .sheet.hidden {
+      transform: translateY(calc(100% - 72px));
+    }
+
+    .sheet::before {
+      content: "";
+      width: 58px;
+      height: 5px;
+      background: rgba(15, 23, 42, 0.25);
+      border-radius: 999px;
+      align-self: center;
+      margin-top: -4px;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .field input {
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      color: inherit;
+    }
+
+    .field input:focus {
+      outline: 2px solid rgba(27, 108, 255, 0.35);
+      outline-offset: 1px;
+    }
+
+    .toggles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .toggles label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    button {
+      font-family: var(--font);
+    }
+
+    .actions button {
+      padding: 14px;
+      border-radius: 16px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 12px 30px rgba(27, 108, 255, 0.25);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+
+    .actions button.secondary {
+      background: #1f2937;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+    }
+
+    .actions button.danger {
+      background: var(--danger);
+      box-shadow: 0 12px 30px rgba(255, 59, 48, 0.25);
+    }
+
+    .actions button:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    .steps {
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.06);
+      padding: 12px 16px 16px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .steps[hidden] {
+      display: none;
+    }
+
+    .steps h3 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .steps ol {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .steps li.active {
+      color: var(--accent-dark);
+      font-weight: 600;
+    }
+
+    .panel-toggle {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 16px);
+      right: 16px;
+      z-index: 1500;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(15, 23, 42, 0.85);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.35);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #recommendationsToggleBtn.panel-toggle {
+      right: auto;
+      left: 16px;
+    }
+
+    .sheet-toggle {
+      top: auto;
+      bottom: calc(72px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(27, 108, 255, 0.92);
+    }
+
+    .panel-toggle:active {
+      transform: scale(0.96);
+      box-shadow: none;
+    }
+
+    .ymaps-suggest__container {
+      z-index: 4000 !important;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --sheet-bg: rgba(18, 25, 38, 0.92);
+        --panel-bg: rgba(18, 25, 38, 0.92);
+        --border: rgba(255, 255, 255, 0.08);
+        --accent: #6aa3ff;
+        --accent-dark: #98c2ff;
+      }
+
+      html, body {
+        background: #0b1220;
+        color: #e2e8f0;
+      }
+
+      .field input {
+        background: rgba(13, 19, 32, 0.9);
+        color: inherit;
+        border-color: rgba(148, 163, 184, 0.18);
+      }
+
+      .toggles label {
+        background: rgba(148, 163, 184, 0.18);
+      }
+
+      .actions button.secondary {
+        background: rgba(15, 23, 42, 0.85);
+      }
+    }
+
+    @media (min-width: 768px) {
+      #recommendations {
+        max-height: 50vh;
+      }
+
+      .sheet {
+        width: min(520px, 92vw);
+        left: auto;
+        right: 24px;
+        bottom: 32px;
+        border-radius: 26px;
+        max-height: 78vh;
+      }
+
+      .sheet.hidden {
+        transform: translateY(calc(100% - 88px));
+      }
+
+      .sheet-toggle {
+        bottom: calc(32px + env(safe-area-inset-bottom));
+      }
+    }
   </style>
-  <!-- ВАЖНО! Вставьте ваш реальный API-ключ Яндекс.Карт вместо YOUR_KEY_HERE -->
   <script src="https://api-maps.yandex.ru/2.1/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU"></script>
 </head>
 <body>
@@ -144,7 +499,6 @@
         bindEvents();
         applyZoneVisibility();
       }
-
       function bindEvents() {
         elements.form.addEventListener('submit', (event) => {
           event.preventDefault();
@@ -211,7 +565,6 @@
         const hidden = panel.classList.contains('hidden');
         button.textContent = hidden ? `Показать ${label}` : `Скрыть ${label}`;
       }
-
       async function loadZonesLazy() {
         if (!state.map) return;
         const requests = [
@@ -280,7 +633,6 @@
       function cloneZones(zones) {
         return zones.map((zone) => ({ ...zone, properties: { ...zone.properties }, placemark: null, circle: null, rendered: false }));
       }
-
       function redrawZonesInView() {
         if (!state.map) return;
         const bounds = state.map.getBounds();
@@ -349,7 +701,6 @@
         }
         return lines.join('<br />');
       }
-
       async function buildRoute(options = {}) {
         try {
           const fromValue = options.from ?? elements.fromInput.value.trim();
@@ -407,36 +758,722 @@
         }
       }
 
-      async function handleDetour() {
-        if (!state.routeData) {
-          alert('Сначала постройте маршрут.');
-          return;
+      async function requestRouteWithRetry(coordsList, avoidToll, attempts = 2) {
+        let lastError = null;
+        for (let i = 0; i < attempts; i += 1) {
+          try {
+            return await requestRoute(coordsList, avoidToll);
+          } catch (error) {
+            lastError = error;
+            if (i < attempts - 1) {
+              await delay(700);
+            }
+          }
         }
-        const intersections = state.routeData.intersections;
-        if (!intersections.length) {
-          alert('Опасных зон на текущем маршруте не обнаружено.');
-          return;
-        }
+        throw lastError || new Error('Не удалось получить маршрут.');
+      }
 
-        const viaPoints = [];
-        intersections.forEach((hit) => {
-          const offset = getOffsetPoint(hit.point, hit.zone.center, hit.zone.radius * 1.3);
-          if (offset) viaPoints.push(offset);
+      async function requestRoute(coordsList, avoidToll) {
+        const points = coordsList.map((coord) => `${coord[1]},${coord[0]}`).join(';');
+        const url = new URL(`https://router.project-osrm.org/route/v1/driving/${points}`);
+        url.searchParams.set('overview', 'full');
+        url.searchParams.set('geometries', 'geojson');
+        url.searchParams.set('steps', 'true');
+        if (avoidToll) {
+          url.searchParams.set('exclude', 'toll');
+        }
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error('Сервис маршрутов временно недоступен.');
+        }
+        const data = await response.json();
+        if (!data.routes || !data.routes.length) {
+          return null;
+        }
+        const route = data.routes[0];
+        const path = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+        const steps = [];
+        route.legs.forEach((leg) => {
+          leg.steps.forEach((step) => {
+            steps.push({
+              text: step.maneuver.instruction || formatStep(step),
+              distance: step.distance,
+              duration: step.duration,
+            });
+          });
+        });
+        return {
+          path,
+          steps,
+          distance: route.distance,
+          duration: route.duration,
+        };
+      }
+      async function handleDetour() {
+        try {
+          if (!state.routeData) { alert('Сначала постройте маршрут.'); return; }
+
+          const ints = state.routeData.intersections || [];
+          if (!ints.length) { alert('Зоны на маршруте не обнаружены.'); return; }
+
+          const viaCandidates = ints.map((hit) => {
+            const offsetMeters = (hit.zone.radius || 400) * 1.3;
+            return getOffsetPoint(hit.point, hit.zone.center, offsetMeters);
+          }).filter(Boolean);
+
+          if (!viaCandidates.length) { alert('Не удалось вычислить точки объезда.'); return; }
+
+          const via = selectEvenly(viaCandidates, 6);
+          const start = state.routeData.coordsList[0];
+          const finish = state.routeData.coordsList[state.routeData.coordsList.length - 1];
+
+          const alt = await requestRoute([start, ...via, finish], elements.tollToggle.checked);
+
+          if (!alt) { alert('Альтернативный маршрут не найден.'); return; }
+
+          drawDetour(alt.path);
+          state.activeRouteKind = 'detour';
+
+          const deltaLen = alt.distance - state.routeData.distance;
+          const deltaDur = alt.duration - state.routeData.duration;
+          const msg = [
+            'Построен альтернативный (объездной) маршрут.',
+            `Разница: ${deltaLen >= 0 ? '+' : ''}${formatDistance(deltaLen)} / ${deltaDur >= 0 ? '+' : ''}${formatDuration(deltaDur)}.`,
+            'Применить объезд вместо основного?'
+          ].join('\n');
+
+          if (confirm(msg)) {
+            state.routeHistory.push(state.routeData);
+            state.routeData = {
+              coordsList: [start, ...via, finish],
+              path: alt.path,
+              distance: alt.distance,
+              duration: alt.duration,
+              steps: alt.steps,
+              intersections: detectIntersections(alt.path),
+            };
+            clearDetour();
+            renderRoute(state.routeData.path, state.routeData.coordsList);
+            renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
+            speakSteps(state.routeData.steps);
+            updateRecommendations();
+          } else {
+            state.activeRouteKind = 'main';
+          }
+        } catch (error) {
+          console.warn('Ошибка построения объезда', error);
+          alert('Не удалось построить альтернативный маршрут. Попробуйте позже.');
+          clearDetour();
+          state.activeRouteKind = 'main';
+        }
+      }
+
+      function renderRoute(path, coordsList) {
+        state.activeRouteKind = 'main';
+        if (state.routeLine) {
+          state.map.geoObjects.remove(state.routeLine);
+        }
+        state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
+        state.routeMarkers = [];
+
+        state.routeLine = new ymaps.Polyline(path, {}, {
+          strokeColor: '#1b6cff',
+          strokeWidth: 6,
+          strokeOpacity: 0.95,
+        });
+        state.map.geoObjects.add(state.routeLine);
+
+        coordsList.forEach((coord, idx) => {
+          const caption = idx === 0 ? 'Старт' : (idx === coordsList.length - 1 ? 'Финиш' : `Точка ${idx}`);
+          const marker = new ymaps.Placemark(coord, {
+            iconCaption: caption,
+          }, {
+            preset: 'islands#blueCircleIcon',
+          });
+          state.routeMarkers.push(marker);
+          state.map.geoObjects.add(marker);
         });
 
-        if (!viaPoints.length) {
-          alert('Не удалось вычислить точки объезда.');
+        const bounds = state.routeLine.geometry.getBounds();
+        if (bounds) {
+          state.map.setBounds(bounds, {
+            checkZoomRange: true,
+            zoomMargin: [40, 240, 240, 40],
+          });
+        }
+      }
+
+      function drawDetour(coords) {
+        clearDetour();
+        if (!state.map || !Array.isArray(coords) || !coords.length) return;
+        state.detourLine = new ymaps.Polyline(coords, {}, {
+          strokeColor: '#9e9e9e',
+          strokeWidth: 5,
+          strokeOpacity: 0.9,
+          strokeStyle: 'shortdash',
+        });
+        state.map.geoObjects.add(state.detourLine);
+      }
+
+      function clearDetour() {
+        if (state.detourLine && state.map) {
+          state.map.geoObjects.remove(state.detourLine);
+        }
+        state.detourLine = null;
+      }
+
+      function renderSteps(steps, simplify = false) {
+        const list = elements.stepsList;
+        list.innerHTML = '';
+        state.currentStepIndex = 0;
+
+        if (!Array.isArray(steps) || !steps.length) {
+          elements.stepsBlock.hidden = true;
           return;
         }
 
-        await buildRoute({
-          from: state.routeData.coordsList[0],
-          to: state.routeData.coordsList[state.routeData.coordsList.length - 1],
-          via: viaPoints,
+        const prepared = steps.map((s, idx) => ({
+          text: (s.text || '').trim(),
+          distance: Number(s.distance) || 0,
+          duration: Number(s.duration) || 0,
+          originalIndex: idx,
+          indices: [idx],
+        }));
+
+        const important = prepared.filter((s) => {
+          const t = s.text.toLowerCase();
+          if (t.includes('depart') || t.includes('arrive') || t.includes('new name')) return false;
+          if (s.distance < 120) return false;
+          return true;
+        });
+
+        const dedup = important.reduce((acc, s) => {
+          if (!acc.length || acc[acc.length - 1].text !== s.text) {
+            acc.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
+          }
+          return acc;
+        }, []);
+
+        const final = !simplify ? dedup : (() => {
+          const out = [];
+          let buf = null;
+          for (const s of dedup) {
+            if (s.distance < 500) {
+              if (!buf) {
+                buf = { ...s, indices: [...(s.indices || [s.originalIndex])] };
+              } else {
+                buf.text += ` → ${s.text}`;
+                buf.distance += s.distance;
+                buf.duration += s.duration;
+                buf.indices.push(...(s.indices || [s.originalIndex]));
+              }
+            } else {
+              if (buf) {
+                out.push(buf);
+                buf = null;
+              }
+              out.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
+            }
+          }
+          if (buf) out.push(buf);
+          return out;
+        })();
+
+        for (let i = 0; i < final.length; i += 1) {
+          const s = final[i];
+          const li = document.createElement('li');
+          const txt = s.text.replace(/depart|arrive/gi, '').trim() || 'Двигайтесь';
+          li.textContent = `${txt} (${formatDistance(s.distance)}, ${formatDuration(s.duration)})`;
+          const indices = Array.isArray(s.indices) && s.indices.length ? s.indices : [s.originalIndex ?? i];
+          li.dataset.originalIndex = String(indices[0]);
+          li.dataset.originalIndices = indices.join(',');
+          li.dataset.listIndex = String(i);
+          list.appendChild(li);
+        }
+
+        elements.stepsBlock.hidden = final.length === 0;
+        if (!elements.stepsBlock.hidden) {
+          list.firstElementChild?.classList.add('active');
+        }
+      }
+
+      function setActiveStep(index) {
+        state.currentStepIndex = index;
+        const items = elements.stepsList.querySelectorAll('li');
+        items.forEach((item) => item.classList.remove('active'));
+        const target = Number(index);
+        let active = elements.stepsList.querySelector(`li[data-original-index="${target}"]`) ||
+          elements.stepsList.querySelector(`li[data-list-index="${target}"]`);
+        if (!active) {
+          active = Array.from(items).find((item) => {
+            const indices = (item.dataset.originalIndices || '')
+              .split(',')
+              .map((v) => Number(v.trim()))
+              .filter((num) => !Number.isNaN(num));
+            return indices.includes(target);
+          }) || null;
+        }
+        if (active) {
+          active.classList.add('active');
+        }
+      }
+
+      function speakSteps(steps) {
+        if (!('speechSynthesis' in window) || !steps || !steps.length) {
+          return;
+        }
+        window.speechSynthesis.cancel();
+        state.voiceQueue = steps.slice();
+        state.speaking = false;
+        state.currentStepIndex = 0;
+        speakNext();
+      }
+
+      function speakNext() {
+        if (!state.voiceQueue.length) {
+          state.speaking = false;
+          return;
+        }
+        const step = state.voiceQueue.shift();
+        const index = state.routeData ? state.routeData.steps.indexOf(step) : -1;
+        if (index >= 0) {
+          setActiveStep(index);
+        }
+        const utterance = new SpeechSynthesisUtterance(step.text);
+        utterance.lang = 'ru-RU';
+        utterance.rate = 1;
+        state.speaking = true;
+        utterance.onend = () => {
+          const pause = Math.min(Math.max(step.duration * 1000, 2000), 8000);
+          setTimeout(speakNext, pause);
+        };
+        window.speechSynthesis.speak(utterance);
+      }
+      function clearRoute() {
+        if (state.routeLine) {
+          state.map.geoObjects.remove(state.routeLine);
+          state.routeLine = null;
+        }
+        clearDetour();
+        state.activeRouteKind = 'main';
+        state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
+        state.routeMarkers = [];
+        state.routeData = null;
+        elements.stepsBlock.hidden = true;
+        elements.stepsList.innerHTML = '';
+        if (window.speechSynthesis && window.speechSynthesis.cancel) {
+          window.speechSynthesis.cancel();
+        }
+        state.voiceQueue = [];
+        state.recommendations = [];
+        updateRecommendations(true);
+      }
+
+      function exportGpx() {
+        if (!state.routeData || !state.routeData.path || !state.routeData.path.length) {
+          alert('Нет данных для экспорта.');
+          return;
+        }
+        const segments = state.routeData.path.map(([lat, lon]) => `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"></trkpt>`).join('\n      ');
+        const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="TruckMap" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Маршрут грузовика</name>\n    <trkseg>\n      ${segments}\n    </trkseg>\n  </trk>\n</gpx>`;
+        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'route.gpx';
+        document.body.appendChild(link);
+        link.click();
+        requestAnimationFrame(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
         });
       }
 
-      // ... остальные JS-функции ...
+      function shareRoute() {
+        if (!state.routeData) {
+          alert('Постройте маршрут, чтобы поделиться.');
+          return;
+        }
+        const points = pickEvenlySpacedPoints(state.routeData.path, 6);
+        if (points.length < 2) {
+          alert('Недостаточно точек маршрута.');
+          return;
+        }
+        const origin = points[0];
+        const destination = points[points.length - 1];
+        const via = points.slice(1, -1);
+        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+        const googleWaypoints = via.map(formatPoint).join('|');
+        const googleUrl = new URL('https://www.google.com/maps/dir/');
+        googleUrl.searchParams.set('api', '1');
+        googleUrl.searchParams.set('origin', formatPoint(origin));
+        googleUrl.searchParams.set('destination', formatPoint(destination));
+        if (googleWaypoints) {
+          googleUrl.searchParams.set('waypoints', googleWaypoints);
+        }
+        googleUrl.searchParams.set('travelmode', 'driving');
+        if (elements.tollToggle.checked) {
+          googleUrl.searchParams.set('avoid', 'tolls');
+        }
+
+        const yandexPoints = points.map(formatPoint).join('~');
+        const yandexUrl = `https://yandex.ru/maps/?rtext=${yandexPoints}&rtt=auto`;
+        const recSummary = state.recommendations.join('\n') || 'Маршрут готов. Проверь ограничения.';
+        const shareText = `Маршрут для рейса:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Карты: ${yandexUrl}\n${recSummary}`;
+        const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        window.open(waLink, '_blank');
+      }
+
+      function locateMe() {
+        if (!navigator.geolocation) {
+          alert('Геолокация не поддерживается вашим устройством.');
+          return;
+        }
+        if (state.watchId) {
+          navigator.geolocation.clearWatch(state.watchId);
+          state.watchId = null;
+        }
+        const success = (position) => {
+          const { latitude, longitude } = position.coords;
+          const coords = [latitude, longitude];
+          state.map.setCenter(coords, Math.max(state.map.getZoom(), 12), { duration: 300 });
+          if (!elements.fromInput.value.trim()) {
+            elements.fromInput.value = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+            saveSettings();
+          }
+        };
+        const error = (err) => {
+          console.warn(err);
+          alert('Не удалось определить текущее местоположение.');
+        };
+        navigator.geolocation.getCurrentPosition(success, error, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 5000,
+        });
+        state.watchId = navigator.geolocation.watchPosition(success, error, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 5000,
+        });
+      }
+      async function resolveInput(value) {
+        if (Array.isArray(value) && value.length === 2) {
+          const lat = Number(value[0]);
+          const lon = Number(value[1]);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            return [lat, lon];
+          }
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          if (Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
+            return [value.lat, value.lon];
+          }
+          if (Number.isFinite(value.latitude) && Number.isFinite(value.longitude)) {
+            return [value.latitude, value.longitude];
+          }
+        }
+        if (typeof value === 'string') {
+          const parsed = parseLatLon(value);
+          if (parsed) {
+            return parsed;
+          }
+          const trimmed = value.trim();
+          if (!trimmed) {
+            return null;
+          }
+          const result = await ymaps.geocode(trimmed, { results: 1 });
+          if (result.geoObjects.getLength()) {
+            const coords = result.geoObjects.get(0).geometry.getCoordinates();
+            return coords;
+          }
+        }
+        return null;
+      }
+
+      function parseLatLon(str) {
+        if (typeof str !== 'string') return null;
+        const clean = str.trim().replace(/\s+/g, '');
+        if (!clean) return null;
+        const parts = clean.split(/[;,]/);
+        if (parts.length !== 2) return null;
+        const lat = Number(parts[0]);
+        const lon = Number(parts[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+        return [lat, lon];
+      }
+      function detectIntersections(path) {
+        if (!path || !path.length) return [];
+        const zones = [];
+        if (elements.weightToggle.checked) {
+          zones.push(...state.weightZones);
+        }
+        if (elements.platonToggle.checked) {
+          zones.push(...state.platonZones);
+        }
+        if (!zones.length) return [];
+        const hits = [];
+        let traveled = 0;
+        for (let i = 0; i < path.length - 1; i += 1) {
+          const start = path[i];
+          const end = path[i + 1];
+          const segmentLength = haversineDistance(start, end);
+          zones.forEach((zone) => {
+            const radius = Number(zone.radius) || 0;
+            if (!radius) return;
+            const projection = projectPointOnSegment(zone.center, start, end);
+            if (projection && projection.distance <= radius) {
+              hits.push({
+                zone,
+                distance: traveled + projection.alongDistance,
+                point: projection.point,
+              });
+            }
+          });
+          traveled += segmentLength;
+        }
+        hits.sort((a, b) => a.distance - b.distance);
+        return hits;
+      }
+
+      function getOffsetPoint(routePoint, zoneCenter, distance) {
+        if (!routePoint || !zoneCenter || !Number.isFinite(distance)) return null;
+        const bearing = bearingBetween(zoneCenter, routePoint);
+        return destinationPoint(zoneCenter, bearing, distance);
+      }
+
+      function selectEvenly(arr, max = 6) {
+        if (!Array.isArray(arr) || !arr.length) return [];
+        if (arr.length <= max) return arr;
+        const out = [];
+        const step = Math.max(1, Math.floor(arr.length / (max + 1)));
+        for (let i = step; i < arr.length && out.length < max; i += step) {
+          out.push(arr[i]);
+        }
+        return out;
+      }
+
+      function pickEvenlySpacedPoints(path, count) {
+        if (!path || !path.length) return [];
+        if (path.length <= count) {
+          return path.slice();
+        }
+        const result = [];
+        const step = (path.length - 1) / (count - 1);
+        for (let i = 0; i < count; i += 1) {
+          const index = Math.round(i * step);
+          result.push(path[index]);
+        }
+        return result;
+      }
+
+      function nearlyEqualPoints(a, b) {
+        return Math.abs(a[0] - b[0]) < 1e-4 && Math.abs(a[1] - b[1]) < 1e-4;
+      }
+      function updateRecommendations(reset = false) {
+        if (reset || !state.routeData) {
+          state.recommendations = ['Постройте маршрут, чтобы получить рекомендации.'];
+          renderRecommendations();
+          return;
+        }
+
+        const ints = Array.isArray(state.routeData.intersections) ? state.routeData.intersections : [];
+        const weightCount = ints.filter((h) => h.zone.type === 'weight').length;
+        const platonCount = ints.filter((h) => h.zone.type === 'platon').length;
+
+        const msgs = [];
+        if (ints.length) {
+          const parts = [];
+          if (weightCount) parts.push(`весовые: ${weightCount}`);
+          if (platonCount) parts.push(`Платон: ${platonCount}`);
+          msgs.push(`На маршруте ${ints.length} зон (${parts.join(', ')}).`);
+        } else {
+          msgs.push('Опасных зон на маршруте не обнаружено.');
+        }
+
+        msgs.push(`Протяжённость: ${formatDistance(state.routeData.distance)}, время: ${formatDuration(state.routeData.duration)}.`);
+
+        if (elements.tollToggle.checked) {
+          msgs.push('Включено «избегать платных дорог» (на demo-OSRM может игнорироваться).');
+        }
+
+        const prev = [...state.routeHistory].reverse().find(Boolean);
+        if (prev?.distance && prev?.duration) {
+          const dd = state.routeData.distance - prev.distance;
+          const dt = state.routeData.duration - prev.duration;
+          if (Math.abs(dd) > 500) msgs.push(`Длина ${dd > 0 ? 'увеличилась' : 'уменьшилась'} на ${formatDistance(Math.abs(dd))}.`);
+          if (Math.abs(dt) > 120) msgs.push(`Время ${dt > 0 ? 'увеличилось' : 'уменьшилось'} на ${formatDuration(Math.abs(dt))}.`);
+        }
+
+        state.recommendations = msgs;
+        renderRecommendations();
+      }
+
+      function renderRecommendations() {
+        const items = Array.isArray(state.recommendations) ? state.recommendations : [];
+        elements.recommendationsList.innerHTML = items.map((msg) => `<li>${escapeHtml(msg)}</li>`).join('');
+      }
+
+      function saveSettings() {
+        try {
+          const payload = {
+            from: elements.fromInput.value,
+            to: elements.toInput.value,
+            weight: elements.weightToggle.checked,
+            platon: elements.platonToggle.checked,
+            toll: elements.tollToggle.checked,
+          };
+          localStorage.setItem('truckMapSettings', JSON.stringify(payload));
+        } catch (error) {
+          console.warn('Не удалось сохранить настройки', error);
+        }
+      }
+
+      function restoreUI() {
+        try {
+          const raw = localStorage.getItem('truckMapSettings');
+          if (!raw) {
+            elements.weightToggle.checked = true;
+            return;
+          }
+          const data = JSON.parse(raw);
+          if (typeof data.from === 'string') elements.fromInput.value = data.from;
+          if (typeof data.to === 'string') elements.toInput.value = data.to;
+          elements.weightToggle.checked = data.weight !== undefined ? data.weight : true;
+          if (typeof data.platon === 'boolean') elements.platonToggle.checked = data.platon;
+          if (typeof data.toll === 'boolean') elements.tollToggle.checked = data.toll;
+        } catch (error) {
+          console.warn('Не удалось восстановить настройки', error);
+          elements.weightToggle.checked = true;
+        }
+      }
+      function formatDistance(value) {
+        if (!Number.isFinite(value)) return '—';
+        const sign = value < 0 ? -1 : 1;
+        const abs = Math.abs(value);
+        const formatted = abs >= 1000 ? `${(abs / 1000).toFixed(1)} км` : `${Math.round(abs)} м`;
+        return sign < 0 ? `-${formatted}` : formatted;
+      }
+
+      function formatDuration(value) {
+        if (!Number.isFinite(value)) return '—';
+        const sign = value < 0 ? -1 : 1;
+        const totalMinutes = Math.round(Math.abs(value) / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const formatted = hours > 0 ? `${hours} ч ${minutes} мин` : `${minutes} мин`;
+        return sign < 0 ? `-${formatted}` : formatted;
+      }
+
+      function formatStep(step) {
+        if (!step) return 'Двигайтесь прямо';
+        const maneuver = step.maneuver && (step.maneuver.instruction || step.maneuver.type);
+        const base = maneuver || 'Двигайтесь';
+        const name = step.name ? ` на ${step.name}` : '';
+        return base + name;
+      }
+
+      function delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function debounce(fn, wait = 300) {
+        let timeout;
+        return (...args) => {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => fn.apply(null, args), wait);
+        };
+      }
+      function haversineDistance(a, b) {
+        const R = 6371000;
+        const toRad = (deg) => deg * Math.PI / 180;
+        const lat1 = toRad(a[0]);
+        const lat2 = toRad(b[0]);
+        const dLat = toRad(b[0] - a[0]);
+        const dLon = toRad(b[1] - a[1]);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+      }
+
+      function bearingBetween(a, b) {
+        const toRad = (deg) => deg * Math.PI / 180;
+        const lat1 = toRad(a[0]);
+        const lat2 = toRad(b[0]);
+        const dLon = toRad(b[1] - a[1]);
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return Math.atan2(y, x);
+      }
+
+      function destinationPoint(start, bearing, distance) {
+        const R = 6371000;
+        const angularDistance = distance / R;
+        const lat1 = toRad(start[0]);
+        const lon1 = toRad(start[1]);
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing));
+        const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
+        return [toDeg(lat2), normalizeLon(toDeg(lon2))];
+      }
+
+      function projectPointOnSegment(point, start, end) {
+        const R = 6371000;
+        const toRad = (deg) => deg * Math.PI / 180;
+        const lat0 = toRad((start[0] + end[0]) / 2);
+        const toXY = ([lat, lon]) => {
+          const x = R * toRad(lon) * Math.cos(lat0);
+          const y = R * toRad(lat);
+          return { x, y };
+        };
+        const startXY = toXY(start);
+        const endXY = toXY(end);
+        const pointXY = toXY(point);
+        const dx = endXY.x - startXY.x;
+        const dy = endXY.y - startXY.y;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) {
+          const distance = Math.hypot(pointXY.x - startXY.x, pointXY.y - startXY.y);
+          return {
+            point: start.slice(),
+            distance,
+            alongDistance: 0,
+          };
+        }
+        const t = Math.max(0, Math.min(1, ((pointXY.x - startXY.x) * dx + (pointXY.y - startXY.y) * dy) / lenSq));
+        const projX = startXY.x + dx * t;
+        const projY = startXY.y + dy * t;
+        const closestLat = toDeg(projY / R);
+        const closestLon = toDeg(projX / (R * Math.cos(lat0)));
+        const distance = Math.hypot(pointXY.x - projX, pointXY.y - projY);
+        const alongDistance = Math.hypot(projX - startXY.x, projY - startXY.y);
+        return {
+          point: [closestLat, closestLon],
+          distance,
+          alongDistance,
+        };
+      }
+
+      function toRad(deg) {
+        return deg * Math.PI / 180;
+      }
+
+      function toDeg(rad) {
+        return rad * 180 / Math.PI;
+      }
+
+      function normalizeLon(lon) {
+        return ((lon + 540) % 360) - 180;
+      }
+
     })();
   </script>
 </body>
