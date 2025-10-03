@@ -1201,6 +1201,7 @@
             intersections: detectIntersections(routeData.path),
             via: viaResolved,
           };
+          markRouteIntersections(state.routeData.intersections); // скрываем нерелевантные зоны
 
           if (isDetour) {
             state.routes.detour = enriched;
