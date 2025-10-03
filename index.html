@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Маршруты для грузовиков</title>
+  <!-- встроенный favicon с грузовиком, чтобы убрать 404 -->
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20x%3D%276%27%20y%3D%2720%27%20width%3D%2734%27%20height%3D%2720%27%20rx%3D%274%27%20fill%3D%27%231b6cff%27%2F%3E%3Crect%20x%3D%2740%27%20y%3D%2726%27%20width%3D%2714%27%20height%3D%2714%27%20rx%3D%273%27%20fill%3D%27%230f4ec2%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230f172a%27%2F%3E%3Ccircle%20cx%3D%2746%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230f172a%27%2F%3E%3C%2Fsvg%3E"
+  />
   <style>
     :root {
       color-scheme: light;
@@ -71,8 +77,8 @@
       padding: 12px 14px; /* уменьшенный отступ для плотного UI */
       backdrop-filter: blur(18px);
       transition: opacity 0.3s ease, transform 0.3s ease;
-      max-width: min(320px, calc(100vw - 32px)); /* ограничиваем ширину панелей */
-      max-height: 35vh; /* ограничиваем высоту панелей */
+      max-width: min(300px, calc(100vw - 32px)); /* более компактная ширина панелей */
+      max-height: 30vh; /* снижаем высоту панелей */
       overflow: hidden;
     }
 
@@ -84,11 +90,11 @@
     #recommendations {
       top: calc(16px + env(safe-area-inset-top));
       left: 16px;
-      width: min(320px, calc(100vw - 32px)); /* компактная ширина */
+      width: min(300px, calc(100vw - 32px)); /* компактная ширина */
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 35vh; /* синхронизируем высоту */
+      max-height: 30vh; /* синхронизируем высоту */
       overflow-y: auto;
     }
 
@@ -119,8 +125,8 @@
       gap: 10px;
       min-width: 0; /* убираем минимальную ширину для компактного вида */
       font-size: 14px;
-      width: min(320px, calc(100vw - 32px)); /* ограничиваем ширину легенды */
-      max-height: 35vh; /* ограничиваем высоту легенды */
+      width: min(300px, calc(100vw - 32px)); /* ограничиваем ширину легенды */
+      max-height: 30vh; /* ограничиваем высоту легенды */
       overflow-y: auto;
     }
 
@@ -169,10 +175,11 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
-      max-height: 35vh; /* снижаем высоту листа */
+      max-height: 30vh; /* снижаем высоту листа */
       transition: transform 0.35s ease;
       backdrop-filter: blur(20px);
       overflow-y: auto; /* разрешаем прокрутку при переполнении */
+      touch-action: pan-y; /* разрешаем вертикальные свайпы */
     }
 
     .sheet.hidden {
@@ -257,6 +264,54 @@
       background: var(--accent);
       box-shadow: 0 12px 30px rgba(27, 108, 255, 0.25);
       transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+      min-height: 44px; /* соответствуем рекомендациям по тач-таргетам */
+    }
+
+    .route-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .route-tabs button {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      background: rgba(15, 23, 42, 0.08);
+      color: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+      min-height: 44px;
+    }
+
+    .route-tabs button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .route-tabs button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .map-type-select {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .map-type-select select {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.95);
+      color: inherit;
+      min-height: 44px;
     }
 
     .actions button.secondary {
@@ -377,16 +432,16 @@
 
     @media (min-width: 768px) {
       #recommendations {
-        max-height: 35vh; /* синхронизируем ограничения высоты */
+        max-height: 30vh; /* синхронизируем ограничения высоты */
       }
 
       .sheet {
-        width: min(320px, 32vw); /* ограничиваем ширину листа на десктопе */
+        width: min(300px, 32vw); /* ограничиваем ширину листа на десктопе */
         left: auto;
         right: 24px;
         bottom: 32px;
         border-radius: 26px;
-        max-height: 35vh;
+        max-height: 30vh;
       }
 
       .sheet.hidden {
@@ -395,6 +450,32 @@
 
       .sheet-toggle {
         bottom: calc(32px + env(safe-area-inset-bottom));
+      }
+    }
+    @media (max-width: 480px) {
+      .panel {
+        max-width: calc(100vw - 32px);
+      }
+
+      #recommendations {
+        width: calc(100vw - 32px);
+        left: 16px;
+        right: 16px;
+      }
+
+      #legend {
+        width: calc(100vw - 32px);
+        left: 16px;
+        right: 16px;
+        top: calc(env(safe-area-inset-top) + 16px + 30vh + 16px); /* располагаем легенду под рекомендациями */
+      }
+
+      .actions {
+        grid-template-columns: 1fr; /* кнопки в одну колонку */
+      }
+
+      .toggles {
+        grid-template-columns: 1fr; /* вертикальное расположение переключателей */
       }
     }
   </style>
@@ -438,6 +519,14 @@
         <label><input type="checkbox" id="tollToggle" /> Избегать платных дорог</label>
         <label><input type="checkbox" id="simplifyToggle" checked /> Упрощённые шаги</label>
       </div>
+      <div class="map-type-select">
+        <label for="mapTypeSelect">Режим карты</label>
+        <select id="mapTypeSelect">
+          <option value="yandex#map">Стандарт</option>
+          <option value="yandex#satellite">Спутник</option>
+          <option value="yandex#hybrid">Гибрид</option>
+        </select>
+      </div>
       <div class="actions">
         <button type="submit" id="buildRouteBtn">Построить маршрут</button>
         <button type="button" class="secondary" id="detourBtn">ИИ-объезд</button>
@@ -445,6 +534,10 @@
         <button type="button" class="secondary" id="gpxBtn">GPX экспорт</button>
         <button type="button" class="secondary" id="shareBtn">Поделиться</button>
         <button type="button" class="secondary" id="locateBtn">Моя позиция</button>
+      </div>
+      <div class="route-tabs" id="routeTabs" hidden>
+        <button type="button" data-route-kind="main" class="active">Основной</button>
+        <button type="button" data-route-kind="detour">Объезд</button>
       </div>
     </form>
     <div class="steps" id="stepsBlock" hidden>
@@ -462,6 +555,7 @@
         routeMarkers: [],
         routeData: null,
         routeHistory: [],
+        routes: { main: null, detour: null }, // храним оба варианта маршрута
         weightZones: [],
         platonZones: [],
         detourList: [],
@@ -471,6 +565,8 @@
         watchId: null,
         recommendations: [],
         activeRouteKind: 'main',
+        mapType: 'yandex#map',
+        sheetTouchStart: null,
       };
 
       const zoneCache = new Map();
@@ -490,6 +586,7 @@
         stepsBlock: document.getElementById('stepsBlock'),
         stepsList: document.getElementById('stepsList'),
         simplifyToggle: document.getElementById('simplifyToggle'),
+        mapTypeSelect: document.getElementById('mapTypeSelect'),
         recommendations: document.getElementById('recommendations'),
         recommendationsList: document.getElementById('recommendationsList'),
         legend: document.getElementById('legend'),
@@ -498,10 +595,12 @@
         recommendationsToggleBtn: document.getElementById('recommendationsToggleBtn'),
         sheetToggleBtn: document.getElementById('sheetToggleBtn'),
         loading: document.getElementById('loading'),
+        routeTabs: document.getElementById('routeTabs'),
       };
 
       let tollWarned = false;
       let loadingCounter = 0;
+      let zoneUidCounter = 0;
 
       if (elements.loading) {
         elements.loading.hidden = true;
@@ -522,6 +621,42 @@
           elements.loading.style.display = 'none';
           elements.loading.hidden = true;
         }
+      }
+
+      function wireSuggestSafe(inputEl) {
+        // безопасно подключаем подсказки: используем SuggestView, если доступен, иначе — фолбэк
+        try {
+          if (ymaps.SuggestView && typeof ymaps.SuggestView === 'function') {
+            // штатный SuggestView с ограничением количества результатов
+            new ymaps.SuggestView(inputEl.id, { results: 8 });
+            return;
+          }
+        } catch (error) {
+          console.warn('SuggestView недоступен:', error);
+        }
+
+        let timer = null;
+        inputEl.addEventListener('input', () => {
+          clearTimeout(timer);
+          const query = inputEl.value.trim();
+          if (query.length < 3) return;
+          timer = setTimeout(async () => {
+            try {
+              if (ymaps.suggest) {
+                await ymaps.suggest(query);
+              }
+            } catch (err) {
+              console.warn('ymaps.suggest error:', err);
+            }
+          }, 250);
+        });
+
+        inputEl.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            document.getElementById('buildRouteBtn')?.click();
+          }
+        });
       }
 
       function syncDetourList() {
@@ -588,10 +723,16 @@
           suppressMapOpenBlock: true,
         });
 
-        new ymaps.SuggestView('fromInput', { results: 8 });
-        new ymaps.SuggestView('toInput', { results: 8 });
+        wireSuggestSafe(elements.fromInput); // мягко подключаем подсказки для поля «Откуда»
+        wireSuggestSafe(elements.toInput); // мягко подключаем подсказки для поля «Куда»
 
         restoreUI();
+        if (state.map && state.mapType) {
+          state.map.setType(state.mapType); // восстанавливаем сохранённый тип карты
+          if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
+          }
+        }
         await loadZonesLazy();
         bindEvents();
         applyZoneVisibility();
@@ -646,6 +787,17 @@
           }
         });
 
+        if (elements.mapTypeSelect) {
+          elements.mapTypeSelect.addEventListener('change', () => {
+            const type = elements.mapTypeSelect.value;
+            state.mapType = type;
+            saveSettings();
+            if (state.map) {
+              state.map.setType(type); // переключаем режим карты по выбору пользователя
+            }
+          });
+        }
+
         elements.fromInput.addEventListener('input', debounce(saveSettings, 400));
         elements.toInput.addEventListener('input', debounce(saveSettings, 400));
 
@@ -660,6 +812,8 @@
         }
 
         setupResponsivePanels(); // настраиваем автоскрытие на маленьких экранах
+        setupSheetSwipe(); // активируем свайп для нижней панели
+        setupRouteTabs(); // подключаем переключение вариантов маршрута
       }
 
       function togglePanel(panel, button, label) {
@@ -701,6 +855,79 @@
           mq.addListener(handler);
         }
       }
+
+      function setupSheetSwipe() {
+        if (!elements.sheet) return;
+        const threshold = 60; // минимальный свайп для переключения состояния
+        elements.sheet.addEventListener('touchstart', (event) => {
+          if (!event.touches || !event.touches.length) return;
+          const touch = event.touches[0];
+          state.sheetTouchStart = { y: touch.clientY, time: Date.now() };
+        }, { passive: true });
+        elements.sheet.addEventListener('touchend', (event) => {
+          if (!state.sheetTouchStart || !event.changedTouches || !event.changedTouches.length) return;
+          const touch = event.changedTouches[0];
+          const deltaY = touch.clientY - state.sheetTouchStart.y;
+          const deltaTime = Date.now() - state.sheetTouchStart.time;
+          state.sheetTouchStart = null;
+          if (Math.abs(deltaY) < threshold || deltaTime > 600) return;
+          if (deltaY > 0) {
+            elements.sheet.classList.add('hidden');
+          } else {
+            elements.sheet.classList.remove('hidden');
+          }
+          setPanelToggleLabel(elements.sheet, elements.sheetToggleBtn, 'панель');
+        }, { passive: true });
+      }
+
+      function setupRouteTabs() {
+        if (!elements.routeTabs) return;
+        elements.routeTabs.querySelectorAll('button[data-route-kind]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const kind = btn.dataset.routeKind;
+            updateActiveRoute(kind, { speak: false }); // переключаем активный маршрут по нажатию без повторного озвучивания
+          });
+        });
+      }
+
+      // Обновляем видимость и доступность вкладок маршрутов
+      function refreshRouteTabs() {
+        if (!elements.routeTabs) return;
+        const hasMain = Boolean(state.routes.main);
+        const hasDetour = Boolean(state.routes.detour);
+        elements.routeTabs.hidden = !hasMain;
+        const mainBtn = elements.routeTabs.querySelector('button[data-route-kind="main"]');
+        const detourBtn = elements.routeTabs.querySelector('button[data-route-kind="detour"]');
+        if (mainBtn) {
+          mainBtn.disabled = !hasMain;
+        }
+        if (detourBtn) {
+          detourBtn.disabled = !hasDetour;
+        }
+        updateRouteTabActive();
+      }
+
+      // Подсвечиваем активную вкладку маршрута
+      function updateRouteTabActive() {
+        if (!elements.routeTabs) return;
+        elements.routeTabs.querySelectorAll('button[data-route-kind]').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.routeKind === state.activeRouteKind);
+        });
+      }
+
+      // Подстраиваем толщину и прозрачность линий маршрута по активному состоянию
+      function applyRouteStyles() {
+        if (state.routeLine) {
+          const activeMain = state.activeRouteKind === 'main';
+          state.routeLine.options.set('strokeOpacity', activeMain ? 0.95 : 0.4);
+          state.routeLine.options.set('strokeWidth', activeMain ? 6 : 4);
+        }
+        if (state.detourLine) {
+          const activeDetour = state.activeRouteKind === 'detour';
+          state.detourLine.options.set('strokeOpacity', activeDetour ? 0.85 : 0.6);
+          state.detourLine.options.set('strokeWidth', activeDetour ? 6 : 5);
+        }
+      }
       async function loadZonesLazy() {
         if (!state.map) return;
         const requests = [
@@ -721,6 +948,41 @@
         ];
         await Promise.all(requests);
         redrawZonesInView();
+      }
+
+      // Переключаемся между основным и объездным маршрутом и обновляем UI
+      function updateActiveRoute(kind, options = {}) {
+        if (!elements.routeTabs) {
+          state.activeRouteKind = kind;
+        }
+        let targetKind = kind;
+        if (!state.routes[targetKind]) {
+          if (state.routes.main) {
+            targetKind = 'main';
+          } else {
+            return;
+          }
+        }
+        state.activeRouteKind = targetKind;
+        state.routeData = state.routes[targetKind];
+        refreshRouteTabs();
+        updateRouteTabActive();
+        applyRouteStyles();
+        const shouldSpeak = options.speak !== false;
+        if (!state.routeData) {
+          elements.stepsBlock.hidden = true;
+          return;
+        }
+        state.routeData.intersections = detectIntersections(state.routeData.path);
+        markRouteIntersections(state.routeData.intersections);
+        renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
+        if (shouldSpeak) {
+          speakSteps(state.routeData.steps);
+        } else if (window.speechSynthesis && window.speechSynthesis.cancel) {
+          window.speechSynthesis.cancel();
+          state.voiceQueue = [];
+        }
+        updateRecommendations();
       }
 
       async function loadGeoJson(url, options) {
@@ -759,6 +1021,7 @@
                 rendered: false,
                 __selected: false,
                 __intersects: true, // по умолчанию зона доступна для отображения
+                uid: `zone-${options.type}-${zoneUidCounter += 1}`, // уникальный идентификатор зоны для действий
               };
             });
           zoneCache.set(url, zones);
@@ -777,6 +1040,7 @@
           rendered: false,
           __selected: Boolean(zone.__selected),
           __intersects: zone.__intersects !== false, // сохраняем флаг пересечения
+          uid: zone.uid,
         }));
       }
       function redrawZonesInView() {
@@ -801,7 +1065,7 @@
           const intersectsRoute = !restrictByRoute || zone.__intersects; // показываем только пересекающиеся зоны
           const shouldRender = visible && intersectsRoute && inBounds(zone.center);
           if (shouldRender && !zone.rendered) {
-            const balloon = buildBalloon(zone.properties);
+            const balloon = buildBalloon(zone);
             zone.placemark = new ymaps.Placemark(zone.center, {
               balloonContent: balloon,
               hintContent: zone.properties.name,
@@ -831,6 +1095,7 @@
             };
             zone.circle.events.add('click', toggleSelection);
             zone.placemark.events.add('click', toggleSelection);
+            zone.placemark.events.add('balloonopen', () => attachBalloonAction(zone)); // добавляем обработчик кнопки «Объехать»
             applyZoneSelectionStyle(zone);
             zone.rendered = true;
           } else if (shouldRender && zone.rendered) {
@@ -853,7 +1118,8 @@
         syncDetourList();
       }
 
-      function buildBalloon(props) {
+      function buildBalloon(zone) {
+        const props = zone?.properties || {};
         const lines = [];
         lines.push(`<strong>${escapeHtml(props.name)}</strong>`);
         const roadParts = [];
@@ -865,25 +1131,51 @@
         if (props.note) {
           lines.push(`Объезд: ${escapeHtml(props.note)}`);
         }
+        lines.push(`<button type="button" class="balloon-detour-btn" data-zone-uid="${escapeHtml(zone?.uid || '')}">Объехать</button>`);
         return lines.join('<br />');
+      }
+
+      function attachBalloonAction(zone) {
+        if (!zone || !zone.uid) return;
+        setTimeout(() => {
+          const selector = `.balloon-detour-btn[data-zone-uid="${zone.uid}"]`;
+          const button = document.querySelector(selector);
+          if (!button) return;
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!state.routeData) {
+              alert('Сначала постройте маршрут.');
+              return;
+            }
+            if (!zone.__selected) {
+              zone.__selected = true;
+              applyZoneSelectionStyle(zone);
+            }
+            syncDetourList();
+            console.log('Добавили зону в объезд из балуна:', zone.properties?.name || 'Без названия');
+          }, { once: true });
+        }, 0);
       }
       async function buildRoute(options = {}) {
         showLoading();
+        let from = null;
+        let to = null;
         try {
           const fromValue = options.from ?? elements.fromInput.value.trim();
           const toValue = options.to ?? elements.toInput.value.trim();
           if (!fromValue || !toValue) {
             alert('Укажите точки начала и конца маршрута.');
-            return;
+            return null;
           }
 
-          const from = await resolveInput(fromValue);
-          const to = await resolveInput(toValue);
+          from = await resolveInput(fromValue);
+          to = await resolveInput(toValue);
           const viaRaw = Array.isArray(options.via) ? options.via : [];
           const isDetour = Boolean(options.detour); // флаг построения объезда
           if (!from || !to) {
             alert('Не удалось определить координаты. Проверьте введённые данные.');
-            return;
+            return null;
           }
 
           const viaResolved = [];
@@ -896,42 +1188,46 @@
           const avoidToll = Boolean(elements.tollToggle.checked);
           const routeData = await requestRouteWithRetry(coordsList, avoidToll, 2);
           if (!routeData) {
-            alert('Маршрут не найден. Попробуйте изменить точки.');
-            return;
+            offerRouteFallback(from, to);
+            return null;
           }
 
-          if (state.routeData) {
-            state.routeHistory.push(state.routeData);
-          }
-
-          state.routeData = {
+          const enriched = {
             coordsList,
             path: routeData.path,
             distance: routeData.distance,
             duration: routeData.duration,
             steps: routeData.steps,
             intersections: detectIntersections(routeData.path),
+            via: viaResolved,
           };
           markRouteIntersections(state.routeData.intersections); // скрываем нерелевантные зоны
 
-          state.activeRouteKind = isDetour ? 'detour' : 'main';
-          clearDetour();
-          resetZoneSelections();
-
-          renderRoute(routeData.path, coordsList, isDetour ? 'detour' : 'main');
           if (isDetour) {
-            drawDetour(routeData.path); // подсвечиваем объезд отдельным штрихом
+            state.routes.detour = enriched;
+            drawDetour(enriched.path); // подсвечиваем объезд отдельным штрихом
+            refreshRouteTabs();
+            updateActiveRoute('detour');
+          } else {
+            if (state.routeData) {
+              state.routeHistory.push(state.routeData);
+            }
+            state.routes.main = enriched;
+            state.routes.detour = null;
+            renderRoute(enriched.path, coordsList, 'main');
+            clearDetour();
+            resetZoneSelections();
+            state.detourList = [];
+            syncDetourList();
+            refreshRouteTabs();
+            updateActiveRoute('main');
           }
-          renderSteps(routeData.steps, elements.simplifyToggle?.checked);
-          speakSteps(routeData.steps);
-          updateRecommendations();
 
-          state.detourList = []; // сбрасываем пользовательский выбор после обновления маршрута
-
-          return state.routeData; // возвращаем данные маршрута для повторного использования
+          return enriched;
         } catch (error) {
           console.warn(error);
-          alert(error && error.message ? error.message : 'Не удалось построить маршрут. Попробуйте ещё раз.');
+          offerRouteFallback(from, to, error);
+          return null;
         } finally {
           hideLoading();
         }
@@ -993,12 +1289,12 @@
       async function handleDetour() {
         showLoading();
         try {
-          if (!state.routeData) {
+          const baseRoute = state.routes.main || state.routeData;
+          if (!baseRoute) {
             alert('Сначала постройте маршрут.');
             return;
           }
 
-          const baseRoute = state.routeData;
           const path = Array.isArray(baseRoute.path) ? baseRoute.path : [];
           if (path.length < 2) {
             alert('Недостаточно данных маршрута для расчёта объезда.');
@@ -1074,7 +1370,11 @@
       }
 
       function renderRoute(path, coordsList, kind = 'main') {
-        state.activeRouteKind = kind; // фиксируем тип текущего маршрута (основной или объездной)
+        if (!state.map || !Array.isArray(path) || !path.length) return;
+        if (kind !== 'main') {
+          drawDetour(path);
+          return;
+        }
         if (state.routeLine) {
           state.map.geoObjects.remove(state.routeLine);
         }
@@ -1106,6 +1406,7 @@
             zoomMargin: [40, 240, 240, 40],
           });
         }
+        applyRouteStyles();
       }
 
       function drawDetour(coords) {
@@ -1118,6 +1419,7 @@
           strokeStyle: 'shortdash',
         });
         state.map.geoObjects.add(state.detourLine);
+        applyRouteStyles();
       }
 
       function clearDetour() {
@@ -1125,6 +1427,13 @@
           state.map.geoObjects.remove(state.detourLine);
         }
         state.detourLine = null;
+        state.routes.detour = null;
+        if (state.activeRouteKind === 'detour') {
+          state.activeRouteKind = 'main';
+          state.routeData = state.routes.main;
+        }
+        refreshRouteTabs();
+        applyRouteStyles();
       }
 
       function renderSteps(steps, simplify = false) {
@@ -1405,8 +1714,12 @@
         state.activeRouteKind = 'main';
         state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
         state.routeMarkers = [];
+        state.routes.main = null;
+        state.routes.detour = null;
         state.routeData = null;
         state.detourList = []; // сбрасываем сохранённый список объездов
+        refreshRouteTabs();
+        applyRouteStyles();
         elements.stepsBlock.hidden = true;
         elements.stepsList.innerHTML = '';
         if (window.speechSynthesis && window.speechSynthesis.cancel) {
@@ -1442,34 +1755,125 @@
           alert('Постройте маршрут, чтобы поделиться.');
           return;
         }
-        const points = pickEvenlySpacedPoints(state.routeData.path, 6);
-        if (points.length < 2) {
-          alert('Недостаточно точек маршрута.');
+        const payload = buildSharePayload(state.routeData);
+        if (!payload) {
+          alert('Недостаточно данных маршрута для шаринга.');
           return;
         }
+        const choice = window.prompt('Выберите способ:\n1 — WhatsApp\n2 — Скопировать ссылки\n3 — Яндекс.Навигатор');
+        if (choice === null) {
+          return;
+        }
+        switch (choice.trim()) {
+          case '':
+            return;
+          case '1':
+            window.open(payload.whatsApp, '_blank');
+            break;
+          case '2':
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(payload.shareText)
+                .then(() => alert('Ссылки скопированы в буфер обмена.'))
+                .catch(() => {
+                  window.prompt('Скопируйте вручную ссылки маршрута:', payload.shareText);
+                });
+            } else {
+              window.prompt('Скопируйте вручную ссылки маршрута:', payload.shareText);
+            }
+            break;
+          case '3':
+            window.location.href = payload.navigatorUrl;
+            break;
+          default:
+            if (payload.googleUrl) {
+              window.open(payload.googleUrl, '_blank');
+            }
+            break;
+        }
+      }
+
+      // Собираем ссылки и текст для шаринга маршрута
+      function buildSharePayload(route) {
+        if (!route || !Array.isArray(route.path) || route.path.length < 2) {
+          return null;
+        }
+        const points = pickEvenlySpacedPoints(route.path, 6);
+        if (points.length < 2) {
+          return null;
+        }
+        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
         const origin = points[0];
         const destination = points[points.length - 1];
         const via = points.slice(1, -1);
-        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
-        const googleWaypoints = via.map(formatPoint).join('|');
         const googleUrl = new URL('https://www.google.com/maps/dir/');
         googleUrl.searchParams.set('api', '1');
         googleUrl.searchParams.set('origin', formatPoint(origin));
         googleUrl.searchParams.set('destination', formatPoint(destination));
-        if (googleWaypoints) {
-          googleUrl.searchParams.set('waypoints', googleWaypoints);
+        if (via.length) {
+          googleUrl.searchParams.set('waypoints', via.map(formatPoint).join('|'));
         }
         googleUrl.searchParams.set('travelmode', 'driving');
         if (elements.tollToggle.checked) {
           googleUrl.searchParams.set('avoid', 'tolls');
         }
-
         const yandexPoints = points.map(formatPoint).join('~');
         const yandexUrl = `https://yandex.ru/maps/?rtext=${yandexPoints}&rtt=auto`;
+        const navParams = new URLSearchParams({
+          lat_from: origin[0].toFixed(6),
+          lon_from: origin[1].toFixed(6),
+          lat_to: destination[0].toFixed(6),
+          lon_to: destination[1].toFixed(6),
+        });
+        const navigatorUrl = `yandexnavi://build_route_on_map?${navParams.toString()}`;
         const recSummary = state.recommendations.join('\n') || 'Маршрут готов. Проверь ограничения.';
-        const shareText = `Маршрут для рейса:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Карты: ${yandexUrl}\n${recSummary}`;
-        const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-        window.open(waLink, '_blank');
+        const routeLabel = state.activeRouteKind === 'detour' ? 'объездной маршрут' : 'основной маршрут';
+        const shareText = `${routeLabel}:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Карты: ${yandexUrl}\n${recSummary}`;
+        const whatsApp = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        return {
+          points,
+          origin,
+          destination,
+          via,
+          googleUrl: googleUrl.toString(),
+          yandexUrl,
+          navigatorUrl,
+          shareText,
+          whatsApp,
+        };
+      }
+
+      // Формируем прямые ссылки на внешние сервисы для fallback и копирования
+      function buildDirectLinks(from, to) {
+        if (!Array.isArray(from) || !Array.isArray(to)) return [];
+        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+        const googleUrl = new URL('https://www.google.com/maps/dir/');
+        googleUrl.searchParams.set('api', '1');
+        googleUrl.searchParams.set('origin', formatPoint(from));
+        googleUrl.searchParams.set('destination', formatPoint(to));
+        googleUrl.searchParams.set('travelmode', 'driving');
+        if (elements.tollToggle.checked) {
+          googleUrl.searchParams.set('avoid', 'tolls');
+        }
+        const yandexUrl = `https://yandex.ru/maps/?rtext=${formatPoint(from)}~${formatPoint(to)}&rtt=auto`;
+        const navigatorUrl = `yandexnavi://build_route_on_map?lat_from=${from[0].toFixed(6)}&lon_from=${from[1].toFixed(6)}&lat_to=${to[0].toFixed(6)}&lon_to=${to[1].toFixed(6)}`;
+        return [
+          `Google Maps: ${googleUrl.toString()}`,
+          `Яндекс.Карты: ${yandexUrl}`,
+          `Яндекс.Навигатор: ${navigatorUrl}`,
+        ];
+      }
+
+      // Показываем пользователю ссылки на сторонние сервисы, если OSRM недоступен
+      function offerRouteFallback(from, to, error) {
+        let message = 'Не удалось получить маршрут от сервера OSRM.';
+        if (error && error.message) {
+          message += `\nПричина: ${error.message}`;
+        }
+        const links = buildDirectLinks(from, to);
+        if (links.length) {
+          message += `\n\nПопробуйте открыть маршрут вручную:\n${links.join('\n')}`;
+        }
+        alert(message);
       }
 
       function locateMe() {
@@ -1530,10 +1934,14 @@
           if (!trimmed) {
             return null;
           }
-          const result = await ymaps.geocode(trimmed, { results: 1 });
-          if (result.geoObjects.getLength()) {
-            const coords = result.geoObjects.get(0).geometry.getCoordinates();
-            return coords;
+          try {
+            const result = await ymaps.geocode(trimmed, { results: 1 });
+            if (result.geoObjects.getLength()) {
+              const coords = result.geoObjects.get(0).geometry.getCoordinates();
+              return coords;
+            }
+          } catch (error) {
+            console.warn('Ошибка геокодирования', error);
           }
         }
         return null;
@@ -1636,6 +2044,18 @@
           if (weightCount) parts.push(`весовые: ${weightCount}`);
           if (platonCount) parts.push(`Платон: ${platonCount}`);
           msgs.push(`На маршруте ${ints.length} зон (${parts.join(', ')}).`);
+          const zoneLabels = [];
+          ints.forEach((hit) => {
+            const zone = hit.zone;
+            if (!zone) return;
+            const name = zone.properties?.name || 'Без названия';
+            const typeLabel = zone.type === 'weight' ? 'весовой контроль' : 'Платон';
+            const text = `${name} — ${typeLabel}`;
+            if (!zoneLabels.includes(text)) {
+              zoneLabels.push(text);
+            }
+          });
+          zoneLabels.forEach((label) => msgs.push(label));
         } else {
           msgs.push('Опасных зон на маршруте не обнаружено.');
         }
@@ -1672,6 +2092,7 @@
             platon: elements.platonToggle.checked,
             toll: elements.tollToggle.checked,
             simplify: elements.simplifyToggle ? elements.simplifyToggle.checked : true,
+            mapType: state.mapType,
           };
           localStorage.setItem('truckMapSettings', JSON.stringify(payload));
         } catch (error) {
@@ -1698,11 +2119,22 @@
           if (typeof data.simplify === 'boolean' && elements.simplifyToggle) {
             elements.simplifyToggle.checked = data.simplify;
           }
+          if (typeof data.mapType === 'string') {
+            state.mapType = data.mapType;
+            if (elements.mapTypeSelect) {
+              elements.mapTypeSelect.value = data.mapType;
+            }
+          } else if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
+          }
         } catch (error) {
           console.warn('Не удалось восстановить настройки', error);
           elements.weightToggle.checked = true;
           if (elements.simplifyToggle) {
             elements.simplifyToggle.checked = true;
+          }
+          if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
           }
         }
       }
