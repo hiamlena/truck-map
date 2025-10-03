@@ -2,269 +2,433 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Маршруты для грузовиков</title>
   <style>
+    :root {
+      color-scheme: light;
+      --sheet-bg: rgba(255, 255, 255, 0.96);
+      --accent: #0066ff;
+      --accent-dark: #0045b8;
+      --danger: #ff3b30;
+      --warning: #ff9500;
+      --surface: rgba(255, 255, 255, 0.9);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --shadow: 0 14px 34px rgba(0, 0, 0, 0.15);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
     html, body {
       height: 100%;
       margin: 0;
-      font-family: "Segoe UI", Roboto, sans-serif;
-      background: #fff;
+      font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+      background: #f4f6fb;
+      color: #1a1c1f;
+      -webkit-tap-highlight-color: transparent;
     }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
     #map {
-      position: absolute;
-      top: 0;
-      left: 0;
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
     }
-    .controls {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      display: grid;
-      gap: 8px;
-      padding: 16px;
-      background: rgba(255, 255, 255, 0.92);
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
-      border-radius: 12px;
-      z-index: 2000;
-      width: min(320px, calc(100vw - 40px));
+
+    .legend {
+      position: fixed;
+      top: calc(16px + env(safe-area-inset-top));
+      right: 16px;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 1200;
+      backdrop-filter: blur(8px);
     }
-    .controls label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 13px;
-      color: #333;
-    }
-    .controls input {
-      padding: 10px 12px;
-      border: 1px solid #d0d7de;
-      border-radius: 8px;
+
+    .legend strong {
+      display: block;
+      margin-bottom: 6px;
       font-size: 15px;
     }
-    .controls button {
-      padding: 12px;
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .legend-dot, .legend-line {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.red { background: var(--danger); }
+    .legend-dot.orange { background: var(--warning); }
+    .legend-line {
+      border-radius: 999px;
+      height: 4px;
+      width: 18px;
+      background: var(--accent);
+    }
+
+    .recommendations {
+      position: fixed;
+      left: 16px;
+      top: calc(16px + env(safe-area-inset-top));
+      width: min(360px, calc(100vw - 32px));
+      padding: 16px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      z-index: 1200;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 40vh;
+      overflow: auto;
+      backdrop-filter: blur(8px);
+    }
+
+    .recommendations h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .recommendations ul {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .recommendations li {
+      line-height: 1.45;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1300;
+      background: var(--sheet-bg);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.2);
+      padding: 20px 18px calc(22px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: 60dvh;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+    }
+
+    .sheet::before {
+      content: "";
+      width: 56px;
+      height: 5px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 999px;
+      align-self: center;
+      margin-top: -4px;
+    }
+
+    .sheet form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(27, 31, 35, 0.12);
+      font-size: 16px;
+      line-height: 20px;
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .field input:focus {
+      outline: 2px solid rgba(0, 102, 255, 0.35);
+      outline-offset: 1px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .actions button {
+      padding: 14px;
+      border-radius: 14px;
       border: none;
-      border-radius: 8px;
-      background: #0a6bff;
-      color: #fff;
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s ease;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 10px 24px rgba(0, 102, 255, 0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
-    .controls button:hover {
-      background: #0059d6;
+
+    .actions button.secondary {
+      background: #2d3036;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
     }
-    .legend {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      padding: 14px 18px;
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 12px;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
-      font-size: 13px;
-      line-height: 1.6;
-      z-index: 1500;
+
+    .actions button.danger {
+      background: var(--danger);
+      box-shadow: 0 10px 24px rgba(255, 59, 48, 0.25);
     }
-    .legend .title {
-      font-weight: 700;
-      margin-bottom: 6px;
+
+    .actions button:active {
+      transform: translateY(1px);
+      box-shadow: none;
     }
-    .legend-item {
+
+    .toggles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .toggles label {
       display: flex;
       align-items: center;
       gap: 8px;
+      background: rgba(15, 22, 32, 0.05);
+      padding: 10px 12px;
+      border-radius: 12px;
     }
-    .legend-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
+
+    .steps {
+      border-radius: 14px;
+      background: rgba(18, 22, 30, 0.06);
+      padding: 12px 14px;
+      max-height: 160px;
+      overflow-y: auto;
     }
-    .legend-dot.red { background: #ff3b30; }
-    .legend-dot.orange { background: #ff9500; }
-    .legend-line {
-      width: 18px;
-      height: 3px;
-      background: #0066ff;
-      border-radius: 3px;
+
+    .steps h3 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+      font-weight: 700;
     }
+
+    .steps ol {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    .steps li.active {
+      color: var(--accent-dark);
+      font-weight: 600;
+    }
+
     .ymaps-suggest__container {
-      z-index: 4000 !important;
+      z-index: 5000 !important;
+    }
+
+    @media (min-width: 768px) {
+      .sheet {
+        width: min(480px, 92vw);
+        right: 24px;
+        left: auto;
+        bottom: 24px;
+        border-radius: var(--radius-lg);
+        max-height: 75vh;
+      }
     }
   </style>
-  <script src="https://api-maps.yandex.ru/2.1/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_KEY_HERE&lang=ru_RU"></script>
 </head>
 <body>
   <div id="map"></div>
-  <div class="controls" id="controls">
-    <label>
-      Откуда
-      <input id="from" type="text" placeholder="Адрес или широта,долгота" autocomplete="off" />
-    </label>
-    <label>
-      Куда
-      <input id="to" type="text" placeholder="Адрес или широта,долгота" autocomplete="off" />
-    </label>
-    <button id="routeBtn" type="button">Маршрут</button>
+
+  <section class="recommendations" id="recommendations">
+    <h2>Рекомендации (beta)</h2>
+    <ul id="recommendationsList">
+      <li>Постройте маршрут и получите советы для рейса.</li>
+    </ul>
+  </section>
+
+  <aside class="legend">
+    <strong>Легенда</strong>
+    <div class="legend-item"><span class="legend-dot red"></span>Весовые рамки</div>
+    <div class="legend-item"><span class="legend-dot orange"></span>Платон</div>
+    <div class="legend-item"><span class="legend-line"></span>Маршрут</div>
+  </aside>
+
+  <div class="sheet" id="bottomSheet">
+    <form id="routeForm">
+      <div class="field">
+        <label for="fromInput">Откуда</label>
+        <input id="fromInput" type="text" placeholder="Адрес или широта,долгота" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="toInput">Куда</label>
+        <input id="toInput" type="text" placeholder="Адрес или широта,долгота" autocomplete="off" />
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="weightToggle" /> Весовые рамки</label>
+        <label><input type="checkbox" id="platonToggle" /> Платон</label>
+        <label><input type="checkbox" id="tollToggle" /> Избегать платных дорог</label>
+      </div>
+      <div class="actions">
+        <button type="submit" id="buildRouteBtn">Построить маршрут</button>
+        <button type="button" id="detourBtn" class="secondary">ИИ-объезд</button>
+        <button type="button" id="clearBtn" class="danger">Очистить</button>
+        <button type="button" id="gpxBtn" class="secondary">GPX экспорт</button>
+        <button type="button" id="shareBtn" class="secondary">Поделиться</button>
+        <button type="button" id="locateBtn" class="secondary">Моя позиция</button>
+      </div>
+    </form>
+    <div class="steps" id="stepsBlock" hidden>
+      <h3>Пошаговая навигация</h3>
+      <ol id="stepsList"></ol>
+    </div>
   </div>
-  <div class="legend">
-    <div class="title">Условные обозначения</div>
-    <div class="legend-item"><span class="legend-dot red"></span> Весовые рамки (круг 500 м)</div>
-    <div class="legend-item"><span class="legend-dot orange"></span> Пункты «Платон» (круг 300 м)</div>
-    <div class="legend-item"><span class="legend-line"></span> Маршрут</div>
-  </div>
+
   <script>
-    (function() {
+    (() => {
       const state = {
         map: null,
         routeLine: null,
-        routeStart: null,
-        routeEnd: null,
-        weightLayer: [],
-        platonLayer: []
+        routeMarkers: [],
+        routeData: null,
+        routeHistory: [],
+        weightZones: [],
+        platonZones: [],
+        voiceQueue: [],
+        speaking: false,
+        currentStepIndex: 0,
+        watchId: null,
+        recommendations: [],
+      };
+
+      const elements = {
+        fromInput: document.getElementById('fromInput'),
+        toInput: document.getElementById('toInput'),
+        weightToggle: document.getElementById('weightToggle'),
+        platonToggle: document.getElementById('platonToggle'),
+        tollToggle: document.getElementById('tollToggle'),
+        form: document.getElementById('routeForm'),
+        stepsBlock: document.getElementById('stepsBlock'),
+        stepsList: document.getElementById('stepsList'),
+        detourBtn: document.getElementById('detourBtn'),
+        clearBtn: document.getElementById('clearBtn'),
+        gpxBtn: document.getElementById('gpxBtn'),
+        shareBtn: document.getElementById('shareBtn'),
+        locateBtn: document.getElementById('locateBtn'),
+        recommendationsList: document.getElementById('recommendationsList'),
       };
 
       ymaps.ready(init);
 
       function init() {
         state.map = new ymaps.Map('map', {
-          center: [55.751244, 37.618423],
-          zoom: 5,
-          controls: ['zoomControl']
+          center: [55.751574, 37.573856],
+          zoom: 6,
+          controls: ['zoomControl'],
         }, {
-          suppressMapOpenBlock: true
+          suppressMapOpenBlock: true,
         });
 
-        new ymaps.SuggestView('from');
-        new ymaps.SuggestView('to');
+        new ymaps.SuggestView('fromInput');
+        new ymaps.SuggestView('toInput');
 
-        document.getElementById('routeBtn').addEventListener('click', buildRoute);
-        document.getElementById('from').addEventListener('keydown', onEnterSubmit);
-        document.getElementById('to').addEventListener('keydown', onEnterSubmit);
-
-        loadGeoJson('weigh_frames.geojson', {
-          color: '#ff3b30',
-          fillColor: 'rgba(255, 59, 48, 0.15)',
-          defaultRadius: 500,
-          collection: state.weightLayer
-        });
-        loadGeoJson('platon.geojson', {
-          color: '#ff9500',
-          fillColor: 'rgba(255, 149, 0, 0.15)',
-          defaultRadius: 300,
-          collection: state.platonLayer
-        });
+        loadZones();
+        bindEvents();
       }
 
-      function onEnterSubmit(event) {
-        if (event.key === 'Enter') {
+      function bindEvents() {
+        elements.form.addEventListener('submit', (event) => {
           event.preventDefault();
           buildRoute();
-        }
-      }
+        });
 
-      function parseLatLon(value) {
-        if (!value) return null;
-        const match = value.trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
-        if (!match) return null;
-        const lat = parseFloat(match[1]);
-        const lon = parseFloat(match[2]);
-        if (!isFinite(lat) || !isFinite(lon)) return null;
-        if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-        return [lat, lon];
-      }
+        elements.detourBtn.addEventListener('click', handleDetour);
+        elements.clearBtn.addEventListener('click', clearRoute);
+        elements.gpxBtn.addEventListener('click', exportGpx);
+        elements.shareBtn.addEventListener('click', shareRoute);
+        elements.locateBtn.addEventListener('click', locateMe);
 
-      function geocodeInput(value) {
-        const coords = parseLatLon(value);
-        if (coords) {
-          return Promise.resolve(coords);
-        }
-        return ymaps.geocode(value, { results: 1 }).then(function(res) {
-          const first = res.geoObjects.get(0);
-          if (!first) {
-            throw new Error('Адрес не найден: ' + value);
+        elements.weightToggle.addEventListener('change', () => {
+          applyZoneVisibility();
+          if (state.routeData) {
+            state.routeData.intersections = detectIntersections(state.routeData.path);
+            updateRecommendations();
           }
-          return first.geometry.getCoordinates();
+        });
+
+        elements.platonToggle.addEventListener('change', () => {
+          applyZoneVisibility();
+          if (state.routeData) {
+            state.routeData.intersections = detectIntersections(state.routeData.path);
+            updateRecommendations();
+          }
+        });
+
+        elements.tollToggle.addEventListener('change', () => {
+          if (state.routeData) {
+            updateRecommendations();
+          }
         });
       }
 
-      async function buildRoute() {
-        const fromInput = document.getElementById('from').value.trim();
-        const toInput = document.getElementById('to').value.trim();
-
-        if (!fromInput || !toInput) {
-          alert('Укажите оба адреса.');
-          return;
-        }
-
-        try {
-          const [fromCoords, toCoords] = await Promise.all([
-            geocodeInput(fromInput),
-            geocodeInput(toInput)
-          ]);
-
-          await requestRoute(fromCoords, toCoords);
-        } catch (error) {
-          console.error(error);
-          alert(error.message || 'Не удалось построить маршрут.');
-        }
-      }
-
-      async function requestRoute(fromCoords, toCoords) {
-        const url = buildOsrmUrl(fromCoords, toCoords);
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('Маршрутный сервис недоступен.');
-        }
-        const data = await response.json();
-        if (!data.routes || !data.routes.length) {
-          throw new Error('Маршрут не найден.');
-        }
-
-        const geometry = data.routes[0].geometry.coordinates;
-        const path = geometry.map(function(coord) {
-          return [coord[1], coord[0]];
-        });
-
-        drawRoute(path, fromCoords, toCoords);
-      }
-
-      function buildOsrmUrl(fromCoords, toCoords) {
-        const fromLonLat = [fromCoords[1], fromCoords[0]].join(',');
-        const toLonLat = [toCoords[1], toCoords[0]].join(',');
-        return 'https://router.project-osrm.org/route/v1/driving/' + fromLonLat + ';' + toLonLat + '?overview=full&geometries=geojson';
-      }
-
-      function drawRoute(path, fromCoords, toCoords) {
-        if (state.routeLine) {
-          state.map.geoObjects.remove(state.routeLine);
-        }
-        if (state.routeStart) {
-          state.map.geoObjects.remove(state.routeStart);
-          state.map.geoObjects.remove(state.routeEnd);
-        }
-
-        state.routeLine = new ymaps.Polyline(path, {}, {
-          strokeColor: '#0066ff',
-          strokeWidth: 5,
-          strokeOpacity: 0.9
-        });
-
-        state.routeStart = new ymaps.Placemark(fromCoords, { iconCaption: 'Старт' }, { preset: 'islands#blueCircleIcon' });
-        state.routeEnd = new ymaps.Placemark(toCoords, { iconCaption: 'Финиш' }, { preset: 'islands#blueCircleIcon' });
-
-        state.map.geoObjects.add(state.routeLine);
-        state.map.geoObjects.add(state.routeStart);
-        state.map.geoObjects.add(state.routeEnd);
-
-        const bounds = state.routeLine.geometry.getBounds();
-        if (bounds) {
-          state.map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40 });
-        }
+      async function loadZones() {
+        await Promise.all([
+          loadGeoJson('weigh_frames.geojson', {
+            color: '#ff3b30',
+            fillColor: 'rgba(255, 59, 48, 0.18)',
+            defaultRadius: 500,
+            collection: state.weightZones,
+          }),
+          loadGeoJson('platon.geojson', {
+            color: '#ff9500',
+            fillColor: 'rgba(255, 149, 0, 0.18)',
+            defaultRadius: 300,
+            collection: state.platonZones,
+          }),
+        ]);
       }
 
       async function loadGeoJson(url, options) {
@@ -272,8 +436,9 @@
           const response = await fetch(url, { cache: 'no-store' });
           if (!response.ok) return;
           const data = await response.json();
-          if (!data.features) return;
-          data.features.forEach(function(feature) {
+          if (!Array.isArray(data.features)) return;
+
+          data.features.forEach((feature) => {
             if (!feature.geometry || feature.geometry.type !== 'Point') return;
             const coords = feature.geometry.coordinates;
             const center = [coords[1], coords[0]];
@@ -283,48 +448,473 @@
 
             const placemark = new ymaps.Placemark(center, {
               balloonContent: balloon,
-              hintContent: props.name || ''
+              hintContent: props.name || '',
             }, {
               preset: 'islands#dotIcon',
               iconColor: options.color,
-              zIndex: 1500
+              zIndex: 1500,
             });
+
             const circle = new ymaps.Circle([center, radius], {
               balloonContent: balloon,
-              hintContent: props.name || ''
+              hintContent: props.name || '',
             }, {
               fillColor: options.fillColor,
               strokeColor: options.color,
               strokeOpacity: 0.6,
-              fillOpacity: 0.4,
+              fillOpacity: 0.35,
               strokeWidth: 2,
-              zIndex: 1200
+              zIndex: 1100,
             });
 
             state.map.geoObjects.add(circle);
             state.map.geoObjects.add(placemark);
 
-            options.collection.push({ placemark, circle });
+            options.collection.push({ placemark, circle, center, radius, props });
           });
+          applyZoneVisibility();
         } catch (error) {
-          console.warn('Не удалось загрузить ' + url, error);
+          console.warn('Не удалось загрузить', url, error);
         }
       }
 
-      function formatBalloon(props) {
+      function formatBalloon(props = {}) {
         const parts = [];
-        if (props.name) {
-          parts.push('<strong>' + escapeHtml(props.name) + '</strong>');
-        }
+        if (props.name) parts.push('<strong>' + escapeHtml(props.name) + '</strong>');
         if (props.road || props.km) {
-          const road = props.road ? escapeHtml(props.road) : '';
-          const km = props.km ? ' ' + escapeHtml(props.km) : '';
-          parts.push(road + km);
+          parts.push([props.road, props.km].filter(Boolean).map(escapeHtml).join(', '));
         }
-        if (props.note) {
-          parts.push(escapeHtml(props.note));
-        }
+        if (props.note) parts.push(escapeHtml(props.note));
         return parts.join('<br>');
+      }
+
+      async function buildRoute(points) {
+        const fromValue = points?.from ?? elements.fromInput.value.trim();
+        const toValue = points?.to ?? elements.toInput.value.trim();
+        if (!fromValue || !toValue) {
+          alert('Укажите точки отправления и назначения.');
+          return;
+        }
+
+        try {
+          const [fromCoords, toCoords] = await Promise.all([
+            resolveInput(fromValue),
+            resolveInput(toValue),
+          ]);
+
+          if (!fromCoords || !toCoords) {
+            alert('Не удалось определить координаты.');
+            return;
+          }
+
+          const coordsList = points?.via ? [fromCoords, ...points.via, toCoords] : [fromCoords, toCoords];
+          const routeData = await requestRoute(coordsList, elements.tollToggle.checked);
+          if (!routeData) {
+            alert('Маршрут не найден.');
+            return;
+          }
+
+          state.routeHistory.push(state.routeData);
+          state.routeData = {
+            coordsList,
+            path: routeData.path,
+            distance: routeData.distance,
+            duration: routeData.duration,
+            steps: routeData.steps,
+            intersections: detectIntersections(routeData.path),
+          };
+
+          renderRoute(routeData.path, coordsList);
+          renderSteps(routeData.steps);
+          speakSteps(routeData.steps);
+          updateRecommendations();
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Ошибка при построении маршрута.');
+        }
+      }
+
+      async function handleDetour() {
+        if (!state.routeData) {
+          alert('Сначала постройте маршрут.');
+          return;
+        }
+        const intersections = state.routeData.intersections;
+        if (!intersections.length) {
+          alert('Опасных зон на текущем маршруте не обнаружено.');
+          return;
+        }
+
+        const viaPoints = [];
+        intersections.forEach((hit) => {
+          const offset = getOffsetPoint(hit.point, hit.zone.center, hit.zone.radius * 1.3);
+          if (offset) viaPoints.push(offset);
+        });
+
+        if (!viaPoints.length) {
+          alert('Не удалось вычислить точки объезда.');
+          return;
+        }
+
+        await buildRoute({
+          from: state.routeData.coordsList[0],
+          to: state.routeData.coordsList[state.routeData.coordsList.length - 1],
+          via: viaPoints,
+        });
+      }
+
+      function renderRoute(path, coordsList) {
+        if (state.routeLine) {
+          state.map.geoObjects.remove(state.routeLine);
+          state.routeLine = null;
+        }
+        state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
+        state.routeMarkers = [];
+
+        state.routeLine = new ymaps.Polyline(path, {}, {
+          strokeColor: '#0066ff',
+          strokeWidth: 6,
+          strokeOpacity: 0.85,
+        });
+
+        coordsList.forEach((coord, idx) => {
+          const type = idx === 0 ? 'Старт' : (idx === coordsList.length - 1 ? 'Финиш' : 'Точка ' + idx);
+          const marker = new ymaps.Placemark(coord, {
+            iconCaption: type,
+          }, {
+            preset: 'islands#blueCircleIcon',
+          });
+          state.routeMarkers.push(marker);
+          state.map.geoObjects.add(marker);
+        });
+
+        state.map.geoObjects.add(state.routeLine);
+        const bounds = state.routeLine.geometry.getBounds();
+        if (bounds) {
+          state.map.setBounds(bounds, { checkZoomRange: true, zoomMargin: [40, 260, 200, 40] });
+        }
+      }
+
+      async function requestRoute(coordsList, avoidToll) {
+        const points = coordsList.map((coord) => coord[1] + ',' + coord[0]).join(';');
+        const url = new URL('https://router.project-osrm.org/route/v1/driving/' + points);
+        url.searchParams.set('overview', 'full');
+        url.searchParams.set('geometries', 'geojson');
+        url.searchParams.set('steps', 'true');
+        if (avoidToll) {
+          url.searchParams.set('exclude', 'toll');
+        }
+
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error('Сервис OSRM недоступен.');
+        }
+
+        const data = await response.json();
+        if (!data.routes || !data.routes.length) return null;
+        const route = data.routes[0];
+
+        const path = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+        const steps = [];
+        route.legs.forEach((leg, legIdx) => {
+          leg.steps.forEach((step, stepIdx) => {
+            steps.push({
+              text: step.maneuver.instruction || formatStep(step, legIdx, stepIdx),
+              distance: step.distance,
+              duration: step.duration,
+            });
+          });
+        });
+
+        return {
+          path,
+          steps,
+          distance: route.distance,
+          duration: route.duration,
+        };
+      }
+
+      function formatStep(step) {
+        const name = step.name ? ' на ' + step.name : '';
+        return (step.maneuver.type || 'Двигайтесь') + name;
+      }
+
+      function renderSteps(steps) {
+        elements.stepsList.innerHTML = '';
+        state.currentStepIndex = 0;
+        if (!steps.length) {
+          elements.stepsBlock.hidden = true;
+          return;
+        }
+
+        steps.forEach((step, idx) => {
+          const li = document.createElement('li');
+          li.textContent = step.text + ' (' + formatDistance(step.distance) + ', ' + formatDuration(step.duration) + ')';
+          if (idx === 0) li.classList.add('active');
+          elements.stepsList.appendChild(li);
+        });
+        elements.stepsBlock.hidden = false;
+      }
+
+      function updateActiveStep(index) {
+        const items = elements.stepsList.querySelectorAll('li');
+        items.forEach((item) => item.classList.remove('active'));
+        if (items[index]) items[index].classList.add('active');
+      }
+
+      function speakSteps(steps) {
+        if (!window.speechSynthesis || !steps.length) return;
+        speechSynthesis.cancel();
+        state.voiceQueue = steps.slice(0, 8).map((step, idx) => `${idx + 1}. ${step.text}`);
+        state.speaking = false;
+        playNextVoiceCue();
+      }
+
+      function playNextVoiceCue() {
+        if (!window.speechSynthesis) return;
+        if (state.speaking) return;
+        const text = state.voiceQueue.shift();
+        if (!text) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'ru-RU';
+        utter.rate = 1;
+        state.speaking = true;
+        utter.onend = () => {
+          state.speaking = false;
+          state.currentStepIndex = Math.min(state.currentStepIndex + 1, elements.stepsList.childElementCount - 1);
+          updateActiveStep(state.currentStepIndex);
+          setTimeout(playNextVoiceCue, 2000);
+        };
+        speechSynthesis.speak(utter);
+      }
+
+      async function resolveInput(value) {
+        const coords = parseLatLon(value);
+        if (coords) return coords;
+        const results = await ymaps.geocode(value, { results: 1 });
+        const first = results.geoObjects.get(0);
+        if (!first) throw new Error('Не найден адрес: ' + value);
+        return first.geometry.getCoordinates();
+      }
+
+      function parseLatLon(value) {
+        const match = value.replace(/\s+/g, '').match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+        if (!match) return null;
+        const lat = parseFloat(match[1]);
+        const lon = parseFloat(match[2]);
+        if (isFinite(lat) && isFinite(lon)) {
+          return [lat, lon];
+        }
+        return null;
+      }
+
+      function applyZoneVisibility() {
+        const showWeights = elements.weightToggle.checked;
+        state.weightZones.forEach((item) => {
+          item.placemark.options.set('visible', showWeights);
+          item.circle.options.set('visible', showWeights);
+        });
+        const showPlaton = elements.platonToggle.checked;
+        state.platonZones.forEach((item) => {
+          item.placemark.options.set('visible', showPlaton);
+          item.circle.options.set('visible', showPlaton);
+        });
+      }
+
+      function detectIntersections(path) {
+        const hits = [];
+        const zones = [];
+        if (elements.weightToggle.checked) zones.push(...state.weightZones.map((z) => ({ ...z, type: 'weight' })));
+        if (elements.platonToggle.checked) zones.push(...state.platonZones.map((z) => ({ ...z, type: 'platon' })));
+        zones.forEach((zone) => {
+          const distance = distanceToZone(path, zone);
+          if (distance <= zone.radius) {
+            hits.push({ zone, distance, point: zone.closestPoint });
+          }
+        });
+        return hits;
+      }
+
+      function distanceToZone(path, zone) {
+        let minDistance = Infinity;
+        let closestPoint = null;
+        for (let i = 0; i < path.length - 1; i++) {
+          const a = path[i];
+          const b = path[i + 1];
+          const proj = projectPointOnSegment(zone.center, a, b);
+          const dist = haversineDistance(zone.center, proj);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestPoint = proj;
+          }
+        }
+        zone.closestPoint = closestPoint;
+        return minDistance;
+      }
+
+      function projectPointOnSegment(point, a, b) {
+        const toRad = Math.PI / 180;
+        // work in mercator-like plane for approximation
+        const ax = a[1] * Math.cos(a[0] * toRad);
+        const ay = a[0];
+        const bx = b[1] * Math.cos(b[0] * toRad);
+        const by = b[0];
+        const px = point[1] * Math.cos(point[0] * toRad);
+        const py = point[0];
+
+        const abx = bx - ax;
+        const aby = by - ay;
+        const apx = px - ax;
+        const apy = py - ay;
+        const abLenSq = abx * abx + aby * aby;
+        const t = abLenSq === 0 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby) / abLenSq));
+        const projX = ax + abx * t;
+        const projY = ay + aby * t;
+
+        const lon = projX / Math.cos(projY * toRad);
+        const lat = projY;
+        return [lat, lon];
+      }
+
+      function haversineDistance(a, b) {
+        const R = 6371000; // meters
+        const dLat = toRad(b[0] - a[0]);
+        const dLon = toRad(b[1] - a[1]);
+        const lat1 = toRad(a[0]);
+        const lat2 = toRad(b[0]);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+      }
+
+      function toRad(value) {
+        return value * Math.PI / 180;
+      }
+
+      function getOffsetPoint(routePoint, zoneCenter, distance) {
+        if (!routePoint) return null;
+        const bearing = bearingBetween(zoneCenter, routePoint);
+        const awayBearing = bearing + 180;
+        return destinationPoint(zoneCenter, awayBearing, distance);
+      }
+
+      function bearingBetween(from, to) {
+        const lat1 = toRad(from[0]);
+        const lat2 = toRad(to[0]);
+        const dLon = toRad(to[1] - from[1]);
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+      }
+
+      function destinationPoint(start, bearingDeg, distance) {
+        const R = 6371000;
+        const δ = distance / R;
+        const θ = toRad(bearingDeg);
+        const φ1 = toRad(start[0]);
+        const λ1 = toRad(start[1]);
+
+        const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+        const λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
+
+        return [φ2 * 180 / Math.PI, ((λ2 * 180 / Math.PI + 540) % 360) - 180];
+      }
+
+      function clearRoute() {
+        if (state.routeLine) {
+          state.map.geoObjects.remove(state.routeLine);
+          state.routeLine = null;
+        }
+        state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
+        state.routeMarkers = [];
+        state.routeData = null;
+        elements.stepsList.innerHTML = '';
+        elements.stepsBlock.hidden = true;
+        speechSynthesis.cancel();
+        updateRecommendations(true);
+      }
+
+      function exportGpx() {
+        if (!state.routeData) {
+          alert('Нет маршрута для экспорта.');
+          return;
+        }
+        const gpx = generateGpx(state.routeData.path);
+        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'route.gpx';
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function generateGpx(path) {
+        const points = path.map(([lat, lon]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"></trkpt>`).join('\n');
+        return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="TruckMap" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>OSRM Route</name>\n    <trkseg>\n${points}\n    </trkseg>\n  </trk>\n</gpx>`;
+      }
+
+      function shareRoute() {
+        if (!state.routeData) {
+          alert('Сначала постройте маршрут.');
+          return;
+        }
+        const from = state.routeData.coordsList[0];
+        const to = state.routeData.coordsList[state.routeData.coordsList.length - 1];
+        const googleUrl = new URL('https://www.google.com/maps/dir/');
+        googleUrl.searchParams.set('api', '1');
+        googleUrl.searchParams.set('origin', from.join(','));
+        googleUrl.searchParams.set('destination', to.join(','));
+        googleUrl.searchParams.set('travelmode', 'driving');
+
+        const yandexUrl = new URL('https://yandex.ru/navi/');
+        yandexUrl.searchParams.set('from', from.join(','));
+        yandexUrl.searchParams.set('to', to.join(','));
+        yandexUrl.searchParams.set('mode', 'driving');
+
+        const recs = state.recommendations.length ? '\n' + state.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n') : '';
+        const message = `Маршрут для рейса:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Навигатор: ${yandexUrl.toString()}${recs}`;
+        const shareUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+        window.open(shareUrl, '_blank');
+      }
+
+      function locateMe() {
+        if (!navigator.geolocation) {
+          alert('Геолокация не поддерживается.');
+          return;
+        }
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          state.map.setCenter(coords, 14);
+          const accuracy = pos.coords.accuracy || 200;
+          const circle = new ymaps.Circle([coords, accuracy], {}, {
+            fillColor: 'rgba(0, 102, 255, 0.15)',
+            strokeColor: '#0066ff',
+            strokeOpacity: 0.6,
+          });
+          state.map.geoObjects.add(circle);
+          setTimeout(() => state.map.geoObjects.remove(circle), 10000);
+        }, (error) => {
+          alert('Не удалось получить позицию: ' + error.message);
+        }, {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 15000,
+        });
+      }
+
+      function formatDistance(meters) {
+        if (meters > 1000) return (meters / 1000).toFixed(1) + ' км';
+        return Math.round(meters) + ' м';
+      }
+
+      function formatDuration(seconds) {
+        const minutes = Math.round(seconds / 60);
+        if (minutes >= 60) {
+          const hours = Math.floor(minutes / 60);
+          const mins = minutes % 60;
+          return hours + ' ч ' + (mins ? mins + ' мин' : '');
+        }
+        return minutes + ' мин';
       }
 
       function escapeHtml(text) {
@@ -334,6 +924,65 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
+      }
+
+      function updateRecommendations(reset = false) {
+        if (reset || !state.routeData) {
+          state.recommendations = ['Постройте маршрут, чтобы получить рекомендации.'];
+          renderRecommendations();
+          return;
+        }
+        const recs = [];
+        const current = state.routeData;
+        const previous = state.routeHistory.slice().reverse().find(Boolean);
+        const weightHits = current.intersections.filter((hit) => hit.zone.type === 'weight').length;
+        const platonHits = current.intersections.filter((hit) => hit.zone.type === 'platon').length;
+
+        if (current.intersections.length) {
+          recs.push(`На пути ${current.intersections.length} контрольных точек, запланируйте время.`);
+        } else {
+          recs.push('Маршрут свободен от контрольных зон.');
+        }
+
+        if (weightHits) {
+          recs.push(`Весовых рамок: ${weightHits}. Подготовьте документы заранее.`);
+        }
+        if (platonHits) {
+          recs.push(`Точек «Платон»: ${platonHits}. Проверьте баланс транспондера.`);
+        }
+
+        if (elements.tollToggle.checked) {
+          recs.push('Маршрут построен с исключением платных дорог.');
+        } else {
+          recs.push('Рассмотрите исключение платных дорог, если важна экономия.');
+        }
+
+        if (previous && previous.distance) {
+          const diffDistance = current.distance - previous.distance;
+          const diffDuration = current.duration - previous.duration;
+          if (Math.abs(diffDistance) > 500) {
+            recs.push(`После корректировки путь ${diffDistance > 0 ? 'удлинился' : 'сократился'} на ${formatDistance(Math.abs(diffDistance))}.`);
+          }
+          if (Math.abs(diffDuration) > 120) {
+            recs.push(`Время в пути ${diffDuration > 0 ? 'увеличилось' : 'уменьшилось'} на ${formatDuration(Math.abs(diffDuration))}.`);
+          }
+        }
+
+        if (recs.length < 3) {
+          recs.push('Следите за голосовыми подсказками и шагами маршрута.');
+        }
+
+        state.recommendations = recs.slice(0, 6);
+        renderRecommendations();
+      }
+
+      function renderRecommendations() {
+        elements.recommendationsList.innerHTML = '';
+        state.recommendations.forEach((rec) => {
+          const li = document.createElement('li');
+          li.textContent = rec;
+          elements.recommendationsList.appendChild(li);
+        });
       }
     })();
   </script>
