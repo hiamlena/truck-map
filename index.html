@@ -627,6 +627,20 @@
         // безопасно подключаем подсказки: используем SuggestView, если доступен, иначе — фолбэк
         try {
           function wireSuggestSafe(inputEl) {
+  // Enter всегда строит маршрут — не зависим от подсказок
+  inputEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('buildRouteBtn')?.click();
+    }
+  });
+
+  // Если API подсказок недоступен — тихо выходим
+  if (!(typeof ymaps === 'object' && typeof ymaps.suggest === 'function')) {
+    return;
+  }
+
+  // Мягкий фолбэк: дергаем ymaps.suggest для прогрева/подсказок (без UI)
   let timer = null;
   inputEl.addEventListener('input', () => {
     clearTimeout(timer);
@@ -634,28 +648,13 @@
     if (query.length < 3) return;
     timer = setTimeout(async () => {
       try {
-        const suggestions = await ymaps.suggest(query);
-        if (Array.isArray(suggestions) && suggestions.length) {
-          console.log('Подсказки:', suggestions.map(s => s.value));
-          // можно сюда встроить выпадающий список для выбора
-        }
-      } catch (err) {
-        console.warn('ymaps.suggest error:', err);
+        await ymaps.suggest(query);
+      } catch {
+        // глушим ошибки suggest, чтобы не спамить консоль
       }
-    }, 300);
-  });
-
-  inputEl.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      document.getElementById('buildRouteBtn')?.click();
-    }
+    }, 250);
   });
 }
-
-        } catch (error) {
-          console.warn('SuggestView недоступен:', error);
-        }
 
         let timer = null;
         inputEl.addEventListener('input', () => {
@@ -664,21 +663,23 @@
           if (query.length < 3) return;
           timer = setTimeout(async () => {
             try {
-              if (ymaps.suggest) {
-                await ymaps.suggest(query);
-              }
-            } catch (err) {
-              console.warn('ymaps.suggest error:', err);
-            }
-          }, 250);
-        });
+<let timer = null;
+inputEl.addEventListener('input', () => {
+  clearTimeout(timer);
+  const query = inputEl.value.trim();
+  if (query.length < 3) return;
 
-        inputEl.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            document.getElementById('buildRouteBtn')?.click();
-          }
-        });
+  timer = setTimeout(async () => {
+    try {
+      if (typeof ymaps === 'object' && typeof ymaps.suggest === 'function') {
+        await ymaps.suggest(query);
+      }
+    } catch {
+      /* тихо глушим ошибки suggest */
+    }
+  }, 250);
+});
+
       }
 
       function syncDetourList() {
@@ -786,7 +787,7 @@
           applyZoneVisibility();
           if (state.routeData) {
             state.routeData.intersections = detectIntersections(state.routeData.path);
-            markRouteIntersections(state.routeData.intersections); // пересчитываем отображение зон
+            markRouteIntersections(state.routeData?.intersections || []); // пересчитываем отображение зон
             updateRecommendations();
           }
         });
@@ -996,7 +997,7 @@
           return;
         }
         state.routeData.intersections = detectIntersections(state.routeData.path);
-        markRouteIntersections(state.routeData.intersections);
+        markRouteIntersections(state.routeData?.intersections || []);
         renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
         if (shouldSpeak) {
           speakSteps(state.routeData.steps);
@@ -1210,7 +1211,7 @@
           const avoidToll = Boolean(elements.tollToggle.checked);
           const routeData = await requestRouteWithRetry(coordsList, avoidToll, 2);
           if (!routeData) {
-            offerRouteFallback(from, to);
+            offerRouteFallback(from, to, new Error('OSRM вернул пустой маршрут'));
             return null;
           }
 
@@ -1317,15 +1318,16 @@
             return;
           }
 
-          const path = Array.isArray(baseRoute.path) ? baseRoute.path : [];
+          const baseRoute = state.routes?.main || state.routeData;
+          const path = Array.isArray(baseRoute?.path) ? baseRoute.path : [];
           if (path.length < 2) {
             alert('Недостаточно данных маршрута для расчёта объезда.');
             return;
           }
 
-          const selectedZones = Array.isArray(state.detourList) && state.detourList.length
-            ? state.detourList.slice()
-            : (baseRoute.intersections || []).map((hit) => hit.zone).filter(Boolean);
+          const baseRoute = state.routes?.main || state.routeData;
+          const path = Array.isArray(baseRoute?.path) ? baseRoute.path : [];
+
 
           const uniqueZones = [];
           const zoneSet = new Set();
@@ -2056,7 +2058,7 @@
           return;
         }
 
-        const ints = Array.isArray(state.routeData.intersections) ? state.routeData.intersections : [];
+        const ints = Array.isArray(state.routeData?.intersections) ? state.routeData.intersections : [];
         const weightCount = ints.filter((h) => h.zone.type === 'weight').length;
         const platonCount = ints.filter((h) => h.zone.type === 'platon').length;
 
