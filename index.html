@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Маршруты для грузовиков</title>
+  <!-- встроенный favicon с грузовиком, чтобы убрать 404 -->
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20x%3D%276%27%20y%3D%2720%27%20width%3D%2734%27%20height%3D%2720%27%20rx%3D%274%27%20fill%3D%27%231b6cff%27%2F%3E%3Crect%20x%3D%2740%27%20y%3D%2726%27%20width%3D%2714%27%20height%3D%2714%27%20rx%3D%273%27%20fill%3D%27%230f4ec2%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230f172a%27%2F%3E%3Ccircle%20cx%3D%2746%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230f172a%27%2F%3E%3C%2Fsvg%3E"
+  />
   <style>
     :root {
       color-scheme: light;
@@ -46,15 +52,34 @@
       z-index: 1;
     }
 
+    #loading {
+      position: fixed; /* делаем индикатор перекрывающим карту */
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.35);
+      color: #fff;
+      font-size: 16px;
+      z-index: 2000;
+    }
+
+    /* Compact panel layout tweaks */
     .panel {
       position: fixed;
       z-index: 1100;
       background: var(--panel-bg);
       box-shadow: var(--shadow);
       border-radius: 18px;
-      padding: 16px 18px;
+      padding: 12px 14px; /* уменьшенный отступ для плотного UI */
       backdrop-filter: blur(18px);
       transition: opacity 0.3s ease, transform 0.3s ease;
+      max-width: min(300px, calc(100vw - 32px)); /* более компактная ширина панелей */
+      max-height: 30vh; /* снижаем высоту панелей */
+      overflow: hidden;
     }
 
     .panel.hidden {
@@ -65,11 +90,11 @@
     #recommendations {
       top: calc(16px + env(safe-area-inset-top));
       left: 16px;
-      width: min(360px, calc(100vw - 32px));
+      width: min(300px, calc(100vw - 32px)); /* компактная ширина */
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 42vh;
+      max-height: 30vh; /* синхронизируем высоту */
       overflow-y: auto;
     }
 
@@ -98,8 +123,11 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-width: 200px;
+      min-width: 0; /* убираем минимальную ширину для компактного вида */
       font-size: 14px;
+      width: min(300px, calc(100vw - 32px)); /* ограничиваем ширину легенды */
+      max-height: 30vh; /* ограничиваем высоту легенды */
+      overflow-y: auto;
     }
 
     #legend.hidden {
@@ -143,14 +171,15 @@
       background: var(--sheet-bg);
       border-radius: 26px 26px 0 0;
       box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.35);
-      padding: 20px 20px calc(28px + env(safe-area-inset-bottom));
+      padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); /* более компактный лист */
       display: flex;
       flex-direction: column;
-      gap: 18px;
-      max-height: 65dvh;
+      gap: 14px;
+      max-height: 30vh; /* снижаем высоту листа */
       transition: transform 0.35s ease;
       backdrop-filter: blur(20px);
-      overflow: hidden;
+      overflow-y: auto; /* разрешаем прокрутку при переполнении */
+      touch-action: pan-y; /* разрешаем вертикальные свайпы */
     }
 
     .sheet.hidden {
@@ -170,7 +199,7 @@
     form {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 14px;
+      gap: 12px; /* более компактные поля */
     }
 
     .field {
@@ -180,15 +209,15 @@
     }
 
     .field label {
-      font-size: 14px;
+      font-size: 13px; /* уменьшаем шрифт */
       font-weight: 600;
     }
 
     .field input {
-      padding: 14px 16px;
-      border-radius: 14px;
+      padding: 12px 14px; /* компактные поля */
+      border-radius: 12px;
       border: 1px solid var(--border);
-      font-size: 16px;
+      font-size: 15px;
       background: rgba(255, 255, 255, 0.95);
       color: inherit;
     }
@@ -202,22 +231,22 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 10px;
-      font-size: 14px;
+      font-size: 13px; /* компактные подписи */
     }
 
     .toggles label {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 12px;
-      border-radius: 12px;
+      padding: 8px 10px; /* уменьшаем отступы */
+      border-radius: 10px;
       background: rgba(15, 23, 42, 0.06);
     }
 
     .actions {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
     button {
@@ -225,16 +254,64 @@
     }
 
     .actions button {
-      padding: 14px;
-      border-radius: 16px;
+      padding: 12px; /* компактные кнопки */
+      border-radius: 14px;
       border: none;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       color: #fff;
       background: var(--accent);
       box-shadow: 0 12px 30px rgba(27, 108, 255, 0.25);
       transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+      min-height: 44px; /* соответствуем рекомендациям по тач-таргетам */
+    }
+
+    .route-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .route-tabs button {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      background: rgba(15, 23, 42, 0.08);
+      color: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+      min-height: 44px;
+    }
+
+    .route-tabs button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .route-tabs button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .map-type-select {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .map-type-select select {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.95);
+      color: inherit;
+      min-height: 44px;
     }
 
     .actions button.secondary {
@@ -255,8 +332,8 @@
     .steps {
       border-radius: 16px;
       background: rgba(15, 23, 42, 0.06);
-      padding: 12px 16px 16px;
-      max-height: 180px;
+      padding: 10px 14px 14px; /* компактные шаги */
+      max-height: 160px;
       overflow-y: auto;
     }
 
@@ -355,16 +432,16 @@
 
     @media (min-width: 768px) {
       #recommendations {
-        max-height: 50vh;
+        max-height: 30vh; /* синхронизируем ограничения высоты */
       }
 
       .sheet {
-        width: min(520px, 92vw);
+        width: min(300px, 32vw); /* ограничиваем ширину листа на десктопе */
         left: auto;
         right: 24px;
         bottom: 32px;
         border-radius: 26px;
-        max-height: 78vh;
+        max-height: 30vh;
       }
 
       .sheet.hidden {
@@ -375,11 +452,38 @@
         bottom: calc(32px + env(safe-area-inset-bottom));
       }
     }
+    @media (max-width: 480px) {
+      .panel {
+        max-width: calc(100vw - 32px);
+      }
+
+      #recommendations {
+        width: calc(100vw - 32px);
+        left: 16px;
+        right: 16px;
+      }
+
+      #legend {
+        width: calc(100vw - 32px);
+        left: 16px;
+        right: 16px;
+        top: calc(env(safe-area-inset-top) + 16px + 30vh + 16px); /* располагаем легенду под рекомендациями */
+      }
+
+      .actions {
+        grid-template-columns: 1fr; /* кнопки в одну колонку */
+      }
+
+      .toggles {
+        grid-template-columns: 1fr; /* вертикальное расположение переключателей */
+      }
+    }
   </style>
   <script src="https://api-maps.yandex.ru/2.1/?apikey=292c3277-6b44-4b1d-88db-813ff4caa159&lang=ru_RU"></script>
 </head>
 <body>
   <div id="map"></div>
+  <div id="loading" hidden>Загрузка...</div>
 
   <button type="button" class="panel-toggle" id="legendToggleBtn">Скрыть легенду</button>
   <button type="button" class="panel-toggle" id="recommendationsToggleBtn">Скрыть рекомендации</button>
@@ -413,7 +517,15 @@
         <label><input type="checkbox" id="weightToggle" checked /> Весовые рамки</label>
         <label><input type="checkbox" id="platonToggle" /> Платон</label>
         <label><input type="checkbox" id="tollToggle" /> Избегать платных дорог</label>
-        <label><input type="checkbox" id="simplifyToggle" /> Упрощённая навигация</label>
+        <label><input type="checkbox" id="simplifyToggle" checked /> Упрощённые шаги</label>
+      </div>
+      <div class="map-type-select">
+        <label for="mapTypeSelect">Режим карты</label>
+        <select id="mapTypeSelect">
+          <option value="yandex#map">Стандарт</option>
+          <option value="yandex#satellite">Спутник</option>
+          <option value="yandex#hybrid">Гибрид</option>
+        </select>
       </div>
       <div class="actions">
         <button type="submit" id="buildRouteBtn">Построить маршрут</button>
@@ -422,6 +534,10 @@
         <button type="button" class="secondary" id="gpxBtn">GPX экспорт</button>
         <button type="button" class="secondary" id="shareBtn">Поделиться</button>
         <button type="button" class="secondary" id="locateBtn">Моя позиция</button>
+      </div>
+      <div class="route-tabs" id="routeTabs" hidden>
+        <button type="button" data-route-kind="main" class="active">Основной</button>
+        <button type="button" data-route-kind="detour">Объезд</button>
       </div>
     </form>
     <div class="steps" id="stepsBlock" hidden>
@@ -439,14 +555,18 @@
         routeMarkers: [],
         routeData: null,
         routeHistory: [],
+        routes: { main: null, detour: null }, // храним оба варианта маршрута
         weightZones: [],
         platonZones: [],
+        detourList: [],
         voiceQueue: [],
         speaking: false,
         currentStepIndex: 0,
         watchId: null,
         recommendations: [],
         activeRouteKind: 'main',
+        mapType: 'yandex#map',
+        sheetTouchStart: null,
       };
 
       const zoneCache = new Map();
@@ -466,6 +586,7 @@
         stepsBlock: document.getElementById('stepsBlock'),
         stepsList: document.getElementById('stepsList'),
         simplifyToggle: document.getElementById('simplifyToggle'),
+        mapTypeSelect: document.getElementById('mapTypeSelect'),
         recommendations: document.getElementById('recommendations'),
         recommendationsList: document.getElementById('recommendationsList'),
         legend: document.getElementById('legend'),
@@ -473,9 +594,113 @@
         legendToggleBtn: document.getElementById('legendToggleBtn'),
         recommendationsToggleBtn: document.getElementById('recommendationsToggleBtn'),
         sheetToggleBtn: document.getElementById('sheetToggleBtn'),
+        loading: document.getElementById('loading'),
+        routeTabs: document.getElementById('routeTabs'),
       };
 
       let tollWarned = false;
+      let loadingCounter = 0;
+      let zoneUidCounter = 0;
+
+      if (elements.loading) {
+        elements.loading.hidden = true;
+        elements.loading.style.display = 'none';
+      }
+
+      function showLoading() {
+        loadingCounter += 1;
+        if (elements.loading) {
+          elements.loading.hidden = false;
+          elements.loading.style.display = 'flex'; // показываем оверлей с центровкой
+        }
+      }
+
+      function hideLoading() {
+        loadingCounter = Math.max(0, loadingCounter - 1);
+        if (loadingCounter === 0 && elements.loading) {
+          elements.loading.style.display = 'none';
+          elements.loading.hidden = true;
+        }
+      }
+
+      function wireSuggestSafe(inputEl) {
+        // Enter запускает построение маршрута, чтобы не зависеть от подсказок
+        inputEl.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            document.getElementById('buildRouteBtn')?.click();
+          }
+        });
+
+        // Если API подсказок недоступен — выходим тихо
+        if (typeof ymaps !== 'object' || typeof ymaps.suggest !== 'function') {
+          return;
+        }
+
+        let timer = null;
+        inputEl.addEventListener('input', () => {
+          clearTimeout(timer);
+          const query = inputEl.value.trim();
+          if (query.length < 3) return;
+          timer = setTimeout(async () => {
+            try {
+              await ymaps.suggest(query);
+            } catch (_) {
+              /* глушим ошибки suggest, чтобы не спамить консоль */
+            }
+          }, 250);
+        });
+      }
+
+      function syncDetourList() {
+        const selected = [...state.weightZones, ...state.platonZones].filter((zone) => zone.__selected);
+        const unique = [];
+        const seen = new Set();
+        selected.forEach((zone) => {
+          if (zone && !seen.has(zone)) {
+            seen.add(zone);
+            unique.push(zone);
+          }
+        });
+        state.detourList = unique; // храним уникальные выбранные зоны
+        console.log('detourList:', unique.map((zone) => zone?.properties?.name || 'Без названия'));
+      }
+
+      function applyZoneSelectionStyle(zone) {
+        if (zone && zone.circle) {
+          zone.circle.options.set('strokeWidth', zone.__selected ? 3 : 2);
+          zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+        }
+      }
+
+      function markRouteIntersections(hits) {
+        const zones = [...state.weightZones, ...state.platonZones];
+        zones.forEach((zone) => {
+          zone.__intersects = false; // изначально скрываем все зоны
+        });
+        hits.forEach((hit) => {
+          if (hit?.zone) {
+            hit.zone.__intersects = true; // отмечаем зоны, пересекающие маршрут
+          }
+        });
+        redrawZonesInView();
+      }
+
+      function clearZoneIntersectionFlags() {
+        [...state.weightZones, ...state.platonZones].forEach((zone) => {
+          zone.__intersects = true; // возвращаем отображение всех зон
+        });
+        redrawZonesInView();
+      }
+
+      function resetZoneSelections() {
+        [...state.weightZones, ...state.platonZones].forEach((zone) => {
+          zone.__selected = false;
+          applyZoneSelectionStyle(zone);
+        });
+        syncDetourList();
+        state.detourList = []; // гарантированно очищаем список после сброса
+      }
 
       updateRecommendations(true);
 
@@ -491,10 +716,16 @@
           suppressMapOpenBlock: true,
         });
 
-        new ymaps.SuggestView('fromInput', { results: 8 });
-        new ymaps.SuggestView('toInput', { results: 8 });
+        wireSuggestSafe(elements.fromInput); // мягко подключаем подсказки для поля «Откуда»
+        wireSuggestSafe(elements.toInput); // мягко подключаем подсказки для поля «Куда»
 
         restoreUI();
+        if (state.map && state.mapType) {
+          state.map.setType(state.mapType); // восстанавливаем сохранённый тип карты
+          if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
+          }
+        }
         await loadZonesLazy();
         bindEvents();
         applyZoneVisibility();
@@ -516,6 +747,7 @@
           applyZoneVisibility();
           if (state.routeData) {
             state.routeData.intersections = detectIntersections(state.routeData.path);
+            markRouteIntersections(state.routeData?.intersections || []); // пересчитываем отображение зон
             updateRecommendations();
           }
         });
@@ -525,6 +757,7 @@
           applyZoneVisibility();
           if (state.routeData) {
             state.routeData.intersections = detectIntersections(state.routeData.path);
+            markRouteIntersections(state.routeData?.intersections || []); // пересчитываем отображение зон
             updateRecommendations();
           }
         });
@@ -532,7 +765,7 @@
         elements.tollToggle.addEventListener('change', () => {
           saveSettings();
           if (elements.tollToggle.checked && !tollWarned) {
-            alert('На публичном сервере OSRM «избегать платных дорог» может не работать. В ссылках на Google Maps режим учитывается.');
+            alert('На публичном OSRM «избегать платных дорог» может игнорироваться. В ссылках Google Maps работает.');
             tollWarned = true;
           }
           if (state.routeData) {
@@ -541,10 +774,22 @@
         });
 
         elements.simplifyToggle?.addEventListener('change', () => {
+          saveSettings();
           if (state.routeData) {
             renderSteps(state.routeData.steps, elements.simplifyToggle.checked);
           }
         });
+
+        if (elements.mapTypeSelect) {
+          elements.mapTypeSelect.addEventListener('change', () => {
+            const type = elements.mapTypeSelect.value;
+            state.mapType = type;
+            saveSettings();
+            if (state.map) {
+              state.map.setType(type); // переключаем режим карты по выбору пользователя
+            }
+          });
+        }
 
         elements.fromInput.addEventListener('input', debounce(saveSettings, 400));
         elements.toInput.addEventListener('input', debounce(saveSettings, 400));
@@ -558,12 +803,123 @@
             redrawZonesInView();
           }, 250));
         }
+
+        setupResponsivePanels(); // настраиваем автоскрытие на маленьких экранах
+        setupSheetSwipe(); // активируем свайп для нижней панели
+        setupRouteTabs(); // подключаем переключение вариантов маршрута
       }
 
       function togglePanel(panel, button, label) {
         panel.classList.toggle('hidden');
+        setPanelToggleLabel(panel, button, label);
+      }
+
+      function setPanelToggleLabel(panel, button, label) {
         const hidden = panel.classList.contains('hidden');
-        button.textContent = hidden ? `Показать ${label}` : `Скрыть ${label}`;
+        if (button) {
+          button.textContent = hidden ? `Показать ${label}` : `Скрыть ${label}`;
+        }
+      }
+
+      function setupResponsivePanels() {
+        const mq = window.matchMedia('(max-width: 540px)');
+        const apply = (event) => {
+          const shouldCollapse = event.matches;
+          const targets = [
+            { panel: elements.legend, button: elements.legendToggleBtn, label: 'легенду' },
+            { panel: elements.recommendations, button: elements.recommendationsToggleBtn, label: 'рекомендации' },
+            { panel: elements.sheet, button: elements.sheetToggleBtn, label: 'панель' },
+          ];
+          targets.forEach(({ panel, button, label }) => {
+            if (!panel) return;
+            if (shouldCollapse) {
+              panel.classList.add('hidden');
+            } else {
+              panel.classList.remove('hidden');
+            }
+            setPanelToggleLabel(panel, button, label);
+          });
+        };
+        apply(mq); // применяем мгновенно
+        const handler = (event) => apply(event);
+        if (typeof mq.addEventListener === 'function') {
+          mq.addEventListener('change', handler);
+        } else if (typeof mq.addListener === 'function') {
+          mq.addListener(handler);
+        }
+      }
+
+      function setupSheetSwipe() {
+        if (!elements.sheet) return;
+        const threshold = 60; // минимальный свайп для переключения состояния
+        elements.sheet.addEventListener('touchstart', (event) => {
+          if (!event.touches || !event.touches.length) return;
+          const touch = event.touches[0];
+          state.sheetTouchStart = { y: touch.clientY, time: Date.now() };
+        }, { passive: true });
+        elements.sheet.addEventListener('touchend', (event) => {
+          if (!state.sheetTouchStart || !event.changedTouches || !event.changedTouches.length) return;
+          const touch = event.changedTouches[0];
+          const deltaY = touch.clientY - state.sheetTouchStart.y;
+          const deltaTime = Date.now() - state.sheetTouchStart.time;
+          state.sheetTouchStart = null;
+          if (Math.abs(deltaY) < threshold || deltaTime > 600) return;
+          if (deltaY > 0) {
+            elements.sheet.classList.add('hidden');
+          } else {
+            elements.sheet.classList.remove('hidden');
+          }
+          setPanelToggleLabel(elements.sheet, elements.sheetToggleBtn, 'панель');
+        }, { passive: true });
+      }
+
+      function setupRouteTabs() {
+        if (!elements.routeTabs) return;
+        elements.routeTabs.querySelectorAll('button[data-route-kind]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const kind = btn.dataset.routeKind;
+            updateActiveRoute(kind, { speak: false }); // переключаем активный маршрут по нажатию без повторного озвучивания
+          });
+        });
+      }
+
+      // Обновляем видимость и доступность вкладок маршрутов
+      function refreshRouteTabs() {
+        if (!elements.routeTabs) return;
+        const hasMain = Boolean(state.routes.main);
+        const hasDetour = Boolean(state.routes.detour);
+        elements.routeTabs.hidden = !hasMain;
+        const mainBtn = elements.routeTabs.querySelector('button[data-route-kind="main"]');
+        const detourBtn = elements.routeTabs.querySelector('button[data-route-kind="detour"]');
+        if (mainBtn) {
+          mainBtn.disabled = !hasMain;
+        }
+        if (detourBtn) {
+          detourBtn.disabled = !hasDetour;
+        }
+        updateRouteTabActive();
+      }
+
+      // Подсвечиваем активную вкладку маршрута
+      function updateRouteTabActive() {
+        if (!elements.routeTabs) return;
+        elements.routeTabs.querySelectorAll('button[data-route-kind]').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.routeKind === state.activeRouteKind);
+        });
+      }
+
+      // Подстраиваем толщину и прозрачность линий маршрута по активному состоянию
+      function applyRouteStyles() {
+        if (state.routeLine) {
+          const activeMain = state.activeRouteKind === 'main';
+          state.routeLine.options.set('strokeOpacity', activeMain ? 0.95 : 0.4);
+          state.routeLine.options.set('strokeWidth', activeMain ? 6 : 4);
+        }
+        if (state.detourLine) {
+          const activeDetour = state.activeRouteKind === 'detour';
+          state.detourLine.options.set('strokeOpacity', activeDetour ? 0.85 : 0.6);
+          state.detourLine.options.set('strokeWidth', activeDetour ? 6 : 5);
+        }
       }
       async function loadZonesLazy() {
         if (!state.map) return;
@@ -585,6 +941,41 @@
         ];
         await Promise.all(requests);
         redrawZonesInView();
+      }
+
+      // Переключаемся между основным и объездным маршрутом и обновляем UI
+      function updateActiveRoute(kind, options = {}) {
+        if (!elements.routeTabs) {
+          state.activeRouteKind = kind;
+        }
+        let targetKind = kind;
+        if (!state.routes[targetKind]) {
+          if (state.routes.main) {
+            targetKind = 'main';
+          } else {
+            return;
+          }
+        }
+        state.activeRouteKind = targetKind;
+        state.routeData = state.routes[targetKind];
+        refreshRouteTabs();
+        updateRouteTabActive();
+        applyRouteStyles();
+        const shouldSpeak = options.speak !== false;
+        if (!state.routeData) {
+          elements.stepsBlock.hidden = true;
+          return;
+        }
+        state.routeData.intersections = detectIntersections(state.routeData.path);
+        markRouteIntersections(state.routeData?.intersections || []);
+        renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
+        if (shouldSpeak) {
+          speakSteps(state.routeData.steps);
+        } else if (window.speechSynthesis && window.speechSynthesis.cancel) {
+          window.speechSynthesis.cancel();
+          state.voiceQueue = [];
+        }
+        updateRecommendations();
       }
 
       async function loadGeoJson(url, options) {
@@ -621,6 +1012,9 @@
                 placemark: null,
                 circle: null,
                 rendered: false,
+                __selected: false,
+                __intersects: true, // по умолчанию зона доступна для отображения
+                uid: `zone-${options.type}-${zoneUidCounter += 1}`, // уникальный идентификатор зоны для действий
               };
             });
           zoneCache.set(url, zones);
@@ -631,7 +1025,16 @@
       }
 
       function cloneZones(zones) {
-        return zones.map((zone) => ({ ...zone, properties: { ...zone.properties }, placemark: null, circle: null, rendered: false }));
+        return zones.map((zone) => ({
+          ...zone,
+          properties: { ...zone.properties },
+          placemark: null,
+          circle: null,
+          rendered: false,
+          __selected: Boolean(zone.__selected),
+          __intersects: zone.__intersects !== false, // сохраняем флаг пересечения
+          uid: zone.uid,
+        }));
       }
       function redrawZonesInView() {
         if (!state.map) return;
@@ -650,10 +1053,12 @@
           return lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
         };
 
+        const restrictByRoute = Boolean(state.routeData); // включаем фильтрацию, если построен маршрут
         const processZone = (zone, visible) => {
-          const shouldRender = visible && inBounds(zone.center);
+          const intersectsRoute = !restrictByRoute || zone.__intersects; // показываем только пересекающиеся зоны
+          const shouldRender = visible && intersectsRoute && inBounds(zone.center);
           if (shouldRender && !zone.rendered) {
-            const balloon = buildBalloon(zone.properties);
+            const balloon = buildBalloon(zone);
             zone.placemark = new ymaps.Placemark(zone.center, {
               balloonContent: balloon,
               hintContent: zone.properties.name,
@@ -664,12 +1069,30 @@
             zone.circle = new ymaps.Circle([zone.center, zone.radius], {}, {
               fillColor: zone.fillColor,
               strokeColor: zone.color,
-              strokeWidth: 2,
+              strokeWidth: zone.__selected ? 3 : 2,
+              strokeOpacity: zone.__selected ? 0.9 : 0.6,
               fillOpacity: 0.35,
             });
             state.map.geoObjects.add(zone.circle);
             state.map.geoObjects.add(zone.placemark);
+            const toggleSelection = () => {
+              if (!state.routeData) {
+                alert('Сначала постройте маршрут.');
+                return;
+              }
+              zone.__selected = !zone.__selected;
+              applyZoneSelectionStyle(zone);
+              syncDetourList();
+              const label = zone.properties?.name || 'Без названия';
+              console.log(`Зона для объезда: ${label} (${zone.__selected ? 'выбрана' : 'снята'})`);
+            };
+            zone.circle.events.add('click', toggleSelection);
+            zone.placemark.events.add('click', toggleSelection);
+            zone.placemark.events.add('balloonopen', () => attachBalloonAction(zone)); // добавляем обработчик кнопки «Объехать»
+            applyZoneSelectionStyle(zone);
             zone.rendered = true;
+          } else if (shouldRender && zone.rendered) {
+            applyZoneSelectionStyle(zone);
           } else if (!shouldRender && zone.rendered) {
             if (zone.circle) state.map.geoObjects.remove(zone.circle);
             if (zone.placemark) state.map.geoObjects.remove(zone.placemark);
@@ -685,9 +1108,11 @@
 
       function applyZoneVisibility() {
         redrawZonesInView();
+        syncDetourList();
       }
 
-      function buildBalloon(props) {
+      function buildBalloon(zone) {
+        const props = zone?.properties || {};
         const lines = [];
         lines.push(`<strong>${escapeHtml(props.name)}</strong>`);
         const roadParts = [];
@@ -699,23 +1124,51 @@
         if (props.note) {
           lines.push(`Объезд: ${escapeHtml(props.note)}`);
         }
+        lines.push(`<button type="button" class="balloon-detour-btn" data-zone-uid="${escapeHtml(zone?.uid || '')}">Объехать</button>`);
         return lines.join('<br />');
       }
+
+      function attachBalloonAction(zone) {
+        if (!zone || !zone.uid) return;
+        setTimeout(() => {
+          const selector = `.balloon-detour-btn[data-zone-uid="${zone.uid}"]`;
+          const button = document.querySelector(selector);
+          if (!button) return;
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!state.routeData) {
+              alert('Сначала постройте маршрут.');
+              return;
+            }
+            if (!zone.__selected) {
+              zone.__selected = true;
+              applyZoneSelectionStyle(zone);
+            }
+            syncDetourList();
+            console.log('Добавили зону в объезд из балуна:', zone.properties?.name || 'Без названия');
+          }, { once: true });
+        }, 0);
+      }
       async function buildRoute(options = {}) {
+        showLoading();
+        let from = null;
+        let to = null;
         try {
           const fromValue = options.from ?? elements.fromInput.value.trim();
           const toValue = options.to ?? elements.toInput.value.trim();
           if (!fromValue || !toValue) {
             alert('Укажите точки начала и конца маршрута.');
-            return;
+            return null;
           }
 
-          const from = await resolveInput(fromValue);
-          const to = await resolveInput(toValue);
+          from = await resolveInput(fromValue);
+          to = await resolveInput(toValue);
           const viaRaw = Array.isArray(options.via) ? options.via : [];
+          const isDetour = Boolean(options.detour); // флаг построения объезда
           if (!from || !to) {
             alert('Не удалось определить координаты. Проверьте введённые данные.');
-            return;
+            return null;
           }
 
           const viaResolved = [];
@@ -728,33 +1181,47 @@
           const avoidToll = Boolean(elements.tollToggle.checked);
           const routeData = await requestRouteWithRetry(coordsList, avoidToll, 2);
           if (!routeData) {
-            alert('Маршрут не найден. Попробуйте изменить точки.');
-            return;
+            offerRouteFallback(from, to, new Error('OSRM вернул пустой маршрут'));
+            return null;
           }
 
-          if (state.routeData) {
-            state.routeHistory.push(state.routeData);
-          }
-
-          state.routeData = {
+          const enriched = {
             coordsList,
             path: routeData.path,
             distance: routeData.distance,
             duration: routeData.duration,
             steps: routeData.steps,
             intersections: detectIntersections(routeData.path),
+            via: viaResolved,
           };
 
-          state.activeRouteKind = 'main';
-          clearDetour();
+          if (isDetour) {
+            state.routes.detour = enriched;
+            drawDetour(enriched.path); // подсвечиваем объезд отдельным штрихом
+            refreshRouteTabs();
+            updateActiveRoute('detour');
+          } else {
+            if (state.routeData) {
+              state.routeHistory.push(state.routeData);
+            }
+            state.routes.main = enriched;
+            state.routes.detour = null;
+            renderRoute(enriched.path, coordsList, 'main');
+            clearDetour();
+            resetZoneSelections();
+            state.detourList = [];
+            syncDetourList();
+            refreshRouteTabs();
+            updateActiveRoute('main');
+          }
 
-          renderRoute(routeData.path, coordsList);
-          renderSteps(routeData.steps, elements.simplifyToggle?.checked);
-          speakSteps(routeData.steps);
-          updateRecommendations();
+          return enriched;
         } catch (error) {
           console.warn(error);
-          alert(error && error.message ? error.message : 'Не удалось построить маршрут. Попробуйте ещё раз.');
+          offerRouteFallback(from, to, error);
+          return null;
+        } finally {
+          hideLoading();
         }
       }
 
@@ -799,6 +1266,8 @@
               text: step.maneuver.instruction || formatStep(step),
               distance: step.distance,
               duration: step.duration,
+              name: step.name || '',
+              maneuver: step.maneuver || null,
             });
           });
         });
@@ -810,66 +1279,94 @@
         };
       }
       async function handleDetour() {
+        showLoading();
         try {
-          if (!state.routeData) { alert('Сначала постройте маршрут.'); return; }
+          if (!state.routes?.main && !state.routeData) {
+            alert('Сначала постройте маршрут.');
+            return;
+          }
 
-          const ints = state.routeData.intersections || [];
-          if (!ints.length) { alert('Зоны на маршруте не обнаружены.'); return; }
+          const baseRoute = state.routes?.main || state.routeData;
+          const path = Array.isArray(baseRoute?.path) ? baseRoute.path : [];
+          if (path.length < 2) {
+            alert('Недостаточно данных маршрута для расчёта объезда.');
+            return;
+          }
 
-          const viaCandidates = ints.map((hit) => {
-            const offsetMeters = (hit.zone.radius || 400) * 1.3;
-            return getOffsetPoint(hit.point, hit.zone.center, offsetMeters);
-          }).filter(Boolean);
+          const selectedZones = Array.isArray(state.detourList) && state.detourList.length
+            ? state.detourList.slice()
+            : (baseRoute?.intersections || []).map((hit) => hit.zone).filter(Boolean);
 
-          if (!viaCandidates.length) { alert('Не удалось вычислить точки объезда.'); return; }
+          const uniqueZones = [];
+          const zoneSet = new Set();
+          selectedZones.forEach((zone) => {
+            if (zone && !zoneSet.has(zone)) {
+              zoneSet.add(zone);
+              uniqueZones.push(zone);
+            }
+          });
+
+          if (!uniqueZones.length) {
+            alert('Зоны на маршруте не обнаружены.');
+            return;
+          }
+
+          const viaCandidates = [];
+          uniqueZones.forEach((zone) => {
+            if (!zone || !Array.isArray(zone.center)) return;
+            let closest = null;
+            for (let i = 0; i < path.length - 1; i += 1) {
+              const start = path[i];
+              const end = path[i + 1];
+              const projection = projectPointOnSegment(zone.center, start, end);
+              if (!projection) continue;
+              if (!closest || projection.distance < closest.distance) {
+                closest = { ...projection };
+              }
+            }
+            if (closest) {
+              const radius = Number(zone.radius) || 0;
+              const offset = radius * 0.8 + 300;
+              const bearing = bearingBetween(closest.point, zone.center);
+              const viaPoint = destinationPoint(closest.point, reverseBearing(bearing), offset);
+              if (!viaCandidates.some((existing) => nearlyEqualPoints(existing, viaPoint))) {
+                viaCandidates.push(viaPoint);
+              }
+            }
+          });
+
+          if (!viaCandidates.length) {
+            alert('Не удалось вычислить точки объезда.');
+            return;
+          }
 
           const via = selectEvenly(viaCandidates, 6);
-          const start = state.routeData.coordsList[0];
-          const finish = state.routeData.coordsList[state.routeData.coordsList.length - 1];
+          console.log('ИИ-объезд via-точки:', via);
 
-          const alt = await requestRoute([start, ...via, finish], elements.tollToggle.checked);
-
-          if (!alt) { alert('Альтернативный маршрут не найден.'); return; }
-
-          drawDetour(alt.path);
-          state.activeRouteKind = 'detour';
-
-          const deltaLen = alt.distance - state.routeData.distance;
-          const deltaDur = alt.duration - state.routeData.duration;
-          const msg = [
-            'Построен альтернативный (объездной) маршрут.',
-            `Разница: ${deltaLen >= 0 ? '+' : ''}${formatDistance(deltaLen)} / ${deltaDur >= 0 ? '+' : ''}${formatDuration(deltaDur)}.`,
-            'Применить объезд вместо основного?'
-          ].join('\n');
-
-          if (confirm(msg)) {
-            state.routeHistory.push(state.routeData);
-            state.routeData = {
-              coordsList: [start, ...via, finish],
-              path: alt.path,
-              distance: alt.distance,
-              duration: alt.duration,
-              steps: alt.steps,
-              intersections: detectIntersections(alt.path),
-            };
-            clearDetour();
-            renderRoute(state.routeData.path, state.routeData.coordsList);
-            renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
-            speakSteps(state.routeData.steps);
-            updateRecommendations();
-          } else {
-            state.activeRouteKind = 'main';
+          const coordsList = Array.isArray(baseRoute.coordsList) ? baseRoute.coordsList : [];
+          if (coordsList.length < 2) {
+            alert('Не удалось определить точки маршрута.');
+            return;
           }
+
+          const start = coordsList[0];
+          const finish = coordsList[coordsList.length - 1];
+
+          await buildRoute({ from: start, to: finish, via, detour: true });
         } catch (error) {
           console.warn('Ошибка построения объезда', error);
           alert('Не удалось построить альтернативный маршрут. Попробуйте позже.');
-          clearDetour();
-          state.activeRouteKind = 'main';
+        } finally {
+          hideLoading();
         }
       }
 
-      function renderRoute(path, coordsList) {
-        state.activeRouteKind = 'main';
+      function renderRoute(path, coordsList, kind = 'main') {
+        if (!state.map || !Array.isArray(path) || !path.length) return;
+        if (kind !== 'main') {
+          drawDetour(path);
+          return;
+        }
         if (state.routeLine) {
           state.map.geoObjects.remove(state.routeLine);
         }
@@ -901,6 +1398,7 @@
             zoomMargin: [40, 240, 240, 40],
           });
         }
+        applyRouteStyles();
       }
 
       function drawDetour(coords) {
@@ -909,10 +1407,11 @@
         state.detourLine = new ymaps.Polyline(coords, {}, {
           strokeColor: '#9e9e9e',
           strokeWidth: 5,
-          strokeOpacity: 0.9,
+          strokeOpacity: 0.75, // делаем штрих приглушённым поверх основного маршрута
           strokeStyle: 'shortdash',
         });
         state.map.geoObjects.add(state.detourLine);
+        applyRouteStyles();
       }
 
       function clearDetour() {
@@ -920,6 +1419,13 @@
           state.map.geoObjects.remove(state.detourLine);
         }
         state.detourLine = null;
+        state.routes.detour = null;
+        if (state.activeRouteKind === 'detour') {
+          state.activeRouteKind = 'main';
+          state.routeData = state.routes.main;
+        }
+        refreshRouteTabs();
+        applyRouteStyles();
       }
 
       function renderSteps(steps, simplify = false) {
@@ -932,68 +1438,203 @@
           return;
         }
 
-        const prepared = steps.map((s, idx) => ({
-          text: (s.text || '').trim(),
-          distance: Number(s.distance) || 0,
-          duration: Number(s.duration) || 0,
-          originalIndex: idx,
-          indices: [idx],
-        }));
+        const noiseTypes = new Set(['depart', 'arrive', 'new name', 'end of road']);
 
-        const important = prepared.filter((s) => {
-          const t = s.text.toLowerCase();
-          if (t.includes('depart') || t.includes('arrive') || t.includes('new name')) return false;
-          if (s.distance < 120) return false;
-          return true;
+        const prepared = steps.map((step, idx) => {
+          const ref = step || {};
+          const localized = getLocalizedInstruction(ref);
+          ref.localizedText = localized || (ref.text || '').trim();
+          const type = (ref.maneuver?.type || ref.type || '').toLowerCase();
+          return {
+            originalIndex: idx,
+            type,
+            distance: Number(ref.distance) || 0,
+            duration: Number(ref.duration) || 0,
+            displayText: ref.localizedText || 'Двигайтесь прямо',
+          };
         });
 
-        const dedup = important.reduce((acc, s) => {
-          if (!acc.length || acc[acc.length - 1].text !== s.text) {
-            acc.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
+        const filtered = prepared.filter((item) => {
+          if (noiseTypes.has(item.type)) return false;
+          const original = steps[item.originalIndex] || {};
+          const text = (original.text || '').toLowerCase();
+          if (!item.type && (text.includes('depart') || text.includes('arrive') || text.includes('new name') || text.includes('end of road'))) {
+            return false;
           }
-          return acc;
-        }, []);
+          if ((item.type === 'roundabout' || item.type === 'rotary' || item.type === 'roundabout turn') && item.distance < 80) return false;
+          if (simplify && item.distance < 120) return false;
+          return Boolean(item.displayText);
+        });
 
-        const final = !simplify ? dedup : (() => {
-          const out = [];
-          let buf = null;
-          for (const s of dedup) {
-            if (s.distance < 500) {
-              if (!buf) {
-                buf = { ...s, indices: [...(s.indices || [s.originalIndex])] };
-              } else {
-                buf.text += ` → ${s.text}`;
-                buf.distance += s.distance;
-                buf.duration += s.duration;
-                buf.indices.push(...(s.indices || [s.originalIndex]));
-              }
-            } else {
-              if (buf) {
-                out.push(buf);
-                buf = null;
-              }
-              out.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
-            }
+        const merged = [];
+        filtered.forEach((item) => {
+          const last = merged[merged.length - 1];
+          if (last && last.displayText === item.displayText) {
+            last.distance += item.distance;
+            last.duration += item.duration;
+            last.indices.push(item.originalIndex);
+          } else {
+            merged.push({
+              displayText: item.displayText,
+              distance: item.distance,
+              duration: item.duration,
+              indices: [item.originalIndex],
+            });
           }
-          if (buf) out.push(buf);
-          return out;
-        })();
+        });
 
-        for (let i = 0; i < final.length; i += 1) {
-          const s = final[i];
-          const li = document.createElement('li');
-          const txt = s.text.replace(/depart|arrive/gi, '').trim() || 'Двигайтесь';
-          li.textContent = `${txt} (${formatDistance(s.distance)}, ${formatDuration(s.duration)})`;
-          const indices = Array.isArray(s.indices) && s.indices.length ? s.indices : [s.originalIndex ?? i];
-          li.dataset.originalIndex = String(indices[0]);
-          li.dataset.originalIndices = indices.join(',');
-          li.dataset.listIndex = String(i);
-          list.appendChild(li);
+        if (!merged.length) {
+          elements.stepsBlock.hidden = true;
+          return;
         }
 
-        elements.stepsBlock.hidden = final.length === 0;
-        if (!elements.stepsBlock.hidden) {
-          list.firstElementChild?.classList.add('active');
+        let finalSteps = merged;
+        if (simplify) {
+          const aggregated = [];
+          let buffer = null;
+          const flushBuffer = () => {
+            if (buffer) {
+              aggregated.push(buffer);
+              buffer = null;
+            }
+          };
+          merged.forEach((item) => {
+            const clone = {
+              displayText: item.displayText,
+              distance: item.distance,
+              duration: item.duration,
+              indices: [...item.indices],
+            };
+            if (clone.distance < 500) {
+              if (!buffer) {
+                buffer = { ...clone }; // начинаем накопление коротких шагов
+              } else {
+                buffer.displayText = `${buffer.displayText} → ${clone.displayText}`;
+                buffer.distance += clone.distance;
+                buffer.duration += clone.duration;
+                buffer.indices.push(...clone.indices);
+              }
+            } else {
+              flushBuffer(); // выводим накопленные короткие шаги перед длинным
+              aggregated.push(clone);
+            }
+          });
+          flushBuffer();
+          finalSteps = aggregated;
+        }
+
+        finalSteps.forEach((item, idx) => {
+          const li = document.createElement('li');
+          li.textContent = `${item.displayText} (${formatDistance(item.distance)}, ${formatDuration(item.duration)})`;
+          const indices = item.indices && item.indices.length ? item.indices : [idx];
+          li.dataset.originalIndex = String(indices[0]);
+          li.dataset.originalIndices = indices.join(',');
+          li.dataset.listIndex = String(idx);
+          list.appendChild(li);
+        });
+
+        elements.stepsBlock.hidden = false;
+        list.firstElementChild?.classList.add('active');
+      }
+
+      function getLocalizedInstruction(step) {
+        if (!step) return '';
+        const rawText = (step.text || '').trim();
+        const maneuver = step.maneuver || {};
+        const type = (maneuver.type || step.type || '').toLowerCase();
+        const modifier = (maneuver.modifier || step.modifier || '').toLowerCase();
+        const name = (step.name || '').trim();
+        const exit = maneuver.exit;
+        const roadOn = name ? ` на ${name}` : '';
+        const roadAlong = name ? ` по ${name}` : '';
+
+        switch (type) {
+          case 'turn': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Поверните ${dir}${roadOn}` : `Поверните${roadOn}`;
+          }
+          case 'fork': {
+            const lane = getLaneDirection(modifier);
+            return lane ? `Держитесь ${lane}${roadAlong}` : `Держитесь${roadAlong}`;
+          }
+          case 'merge': {
+            const lane = getLaneDirection(modifier);
+            return lane ? `Перестройтесь ${lane}${roadAlong}` : `Перестройтесь${roadAlong}`;
+          }
+          case 'off ramp':
+          case 'on ramp':
+          case 'ramp':
+          case 'exit': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Съезд ${dir}${roadOn}` : `Съезд${roadOn}`;
+          }
+          case 'roundabout':
+          case 'roundabout turn':
+          case 'rotary': {
+            const exitText = exit ? `${exit}-й съезд` : 'нужный съезд';
+            return `На кольцевой развязке используйте ${exitText}${roadOn}`;
+          }
+          case 'continue': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            if (modifier === 'straight' || !modifier) {
+              return `Продолжайте движение${roadAlong}`;
+            }
+            const lane = getLaneDirection(modifier);
+            if (lane) return `Продолжайте движение, держитесь ${lane}${roadAlong}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Продолжайте движение ${dir}${roadAlong}` : `Продолжайте движение${roadAlong}`;
+          }
+          default:
+            break;
+        }
+
+        if (rawText) return rawText;
+        return name ? `Двигайтесь по ${name}` : '';
+      }
+
+      function getDirectionText(modifier) {
+        switch (modifier) {
+          case 'left':
+            return 'налево';
+          case 'right':
+            return 'направо';
+          case 'sharp_left':
+            return 'резко налево';
+          case 'sharp_right':
+            return 'резко направо';
+          case 'slight_left':
+            return 'плавно налево';
+          case 'slight_right':
+            return 'плавно направо';
+          case 'straight':
+            return 'прямо';
+          case 'uturn':
+            return 'на разворот';
+          default:
+            return '';
+        }
+      }
+
+      function getLaneDirection(modifier) {
+        switch (modifier) {
+          case 'left':
+            return 'левее';
+          case 'right':
+            return 'правее';
+          case 'slight_left':
+            return 'плавно левее';
+          case 'slight_right':
+            return 'плавно правее';
+          case 'sharp_left':
+            return 'резко левее';
+          case 'sharp_right':
+            return 'резко правее';
+          case 'straight':
+            return 'прямо';
+          default:
+            return '';
         }
       }
 
@@ -1022,6 +1663,11 @@
         if (!('speechSynthesis' in window) || !steps || !steps.length) {
           return;
         }
+        steps.forEach((step) => {
+          if (!step) return;
+          const localized = getLocalizedInstruction(step);
+          step.localizedText = localized || (step.text || '').trim();
+        });
         window.speechSynthesis.cancel();
         state.voiceQueue = steps.slice();
         state.speaking = false;
@@ -1039,7 +1685,7 @@
         if (index >= 0) {
           setActiveStep(index);
         }
-        const utterance = new SpeechSynthesisUtterance(step.text);
+        const utterance = new SpeechSynthesisUtterance(step.localizedText || step.text);
         utterance.lang = 'ru-RU';
         utterance.rate = 1;
         state.speaking = true;
@@ -1054,11 +1700,18 @@
           state.map.geoObjects.remove(state.routeLine);
           state.routeLine = null;
         }
+        resetZoneSelections();
         clearDetour();
+        clearZoneIntersectionFlags(); // возвращаем все зоны при очистке
         state.activeRouteKind = 'main';
         state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
         state.routeMarkers = [];
+        state.routes.main = null;
+        state.routes.detour = null;
         state.routeData = null;
+        state.detourList = []; // сбрасываем сохранённый список объездов
+        refreshRouteTabs();
+        applyRouteStyles();
         elements.stepsBlock.hidden = true;
         elements.stepsList.innerHTML = '';
         if (window.speechSynthesis && window.speechSynthesis.cancel) {
@@ -1094,34 +1747,125 @@
           alert('Постройте маршрут, чтобы поделиться.');
           return;
         }
-        const points = pickEvenlySpacedPoints(state.routeData.path, 6);
-        if (points.length < 2) {
-          alert('Недостаточно точек маршрута.');
+        const payload = buildSharePayload(state.routeData);
+        if (!payload) {
+          alert('Недостаточно данных маршрута для шаринга.');
           return;
         }
+        const choice = window.prompt('Выберите способ:\n1 — WhatsApp\n2 — Скопировать ссылки\n3 — Яндекс.Навигатор');
+        if (choice === null) {
+          return;
+        }
+        switch (choice.trim()) {
+          case '':
+            return;
+          case '1':
+            window.open(payload.whatsApp, '_blank');
+            break;
+          case '2':
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(payload.shareText)
+                .then(() => alert('Ссылки скопированы в буфер обмена.'))
+                .catch(() => {
+                  window.prompt('Скопируйте вручную ссылки маршрута:', payload.shareText);
+                });
+            } else {
+              window.prompt('Скопируйте вручную ссылки маршрута:', payload.shareText);
+            }
+            break;
+          case '3':
+            window.location.href = payload.navigatorUrl;
+            break;
+          default:
+            if (payload.googleUrl) {
+              window.open(payload.googleUrl, '_blank');
+            }
+            break;
+        }
+      }
+
+      // Собираем ссылки и текст для шаринга маршрута
+      function buildSharePayload(route) {
+        if (!route || !Array.isArray(route.path) || route.path.length < 2) {
+          return null;
+        }
+        const points = pickEvenlySpacedPoints(route.path, 6);
+        if (points.length < 2) {
+          return null;
+        }
+        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
         const origin = points[0];
         const destination = points[points.length - 1];
         const via = points.slice(1, -1);
-        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
-        const googleWaypoints = via.map(formatPoint).join('|');
         const googleUrl = new URL('https://www.google.com/maps/dir/');
         googleUrl.searchParams.set('api', '1');
         googleUrl.searchParams.set('origin', formatPoint(origin));
         googleUrl.searchParams.set('destination', formatPoint(destination));
-        if (googleWaypoints) {
-          googleUrl.searchParams.set('waypoints', googleWaypoints);
+        if (via.length) {
+          googleUrl.searchParams.set('waypoints', via.map(formatPoint).join('|'));
         }
         googleUrl.searchParams.set('travelmode', 'driving');
         if (elements.tollToggle.checked) {
           googleUrl.searchParams.set('avoid', 'tolls');
         }
-
         const yandexPoints = points.map(formatPoint).join('~');
         const yandexUrl = `https://yandex.ru/maps/?rtext=${yandexPoints}&rtt=auto`;
+        const navParams = new URLSearchParams({
+          lat_from: origin[0].toFixed(6),
+          lon_from: origin[1].toFixed(6),
+          lat_to: destination[0].toFixed(6),
+          lon_to: destination[1].toFixed(6),
+        });
+        const navigatorUrl = `yandexnavi://build_route_on_map?${navParams.toString()}`;
         const recSummary = state.recommendations.join('\n') || 'Маршрут готов. Проверь ограничения.';
-        const shareText = `Маршрут для рейса:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Карты: ${yandexUrl}\n${recSummary}`;
-        const waLink = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-        window.open(waLink, '_blank');
+        const routeLabel = state.activeRouteKind === 'detour' ? 'объездной маршрут' : 'основной маршрут';
+        const shareText = `${routeLabel}:\nGoogle Maps: ${googleUrl.toString()}\nЯндекс.Карты: ${yandexUrl}\n${recSummary}`;
+        const whatsApp = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        return {
+          points,
+          origin,
+          destination,
+          via,
+          googleUrl: googleUrl.toString(),
+          yandexUrl,
+          navigatorUrl,
+          shareText,
+          whatsApp,
+        };
+      }
+
+      // Формируем прямые ссылки на внешние сервисы для fallback и копирования
+      function buildDirectLinks(from, to) {
+        if (!Array.isArray(from) || !Array.isArray(to)) return [];
+        const formatPoint = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+        const googleUrl = new URL('https://www.google.com/maps/dir/');
+        googleUrl.searchParams.set('api', '1');
+        googleUrl.searchParams.set('origin', formatPoint(from));
+        googleUrl.searchParams.set('destination', formatPoint(to));
+        googleUrl.searchParams.set('travelmode', 'driving');
+        if (elements.tollToggle.checked) {
+          googleUrl.searchParams.set('avoid', 'tolls');
+        }
+        const yandexUrl = `https://yandex.ru/maps/?rtext=${formatPoint(from)}~${formatPoint(to)}&rtt=auto`;
+        const navigatorUrl = `yandexnavi://build_route_on_map?lat_from=${from[0].toFixed(6)}&lon_from=${from[1].toFixed(6)}&lat_to=${to[0].toFixed(6)}&lon_to=${to[1].toFixed(6)}`;
+        return [
+          `Google Maps: ${googleUrl.toString()}`,
+          `Яндекс.Карты: ${yandexUrl}`,
+          `Яндекс.Навигатор: ${navigatorUrl}`,
+        ];
+      }
+
+      // Показываем пользователю ссылки на сторонние сервисы, если OSRM недоступен
+      function offerRouteFallback(from, to, error) {
+        let message = 'Не удалось получить маршрут от сервера OSRM.';
+        if (error && error.message) {
+          message += `\nПричина: ${error.message}`;
+        }
+        const links = buildDirectLinks(from, to);
+        if (links.length) {
+          message += `\n\nПопробуйте открыть маршрут вручную:\n${links.join('\n')}`;
+        }
+        alert(message);
       }
 
       function locateMe() {
@@ -1182,10 +1926,14 @@
           if (!trimmed) {
             return null;
           }
-          const result = await ymaps.geocode(trimmed, { results: 1 });
-          if (result.geoObjects.getLength()) {
-            const coords = result.geoObjects.get(0).geometry.getCoordinates();
-            return coords;
+          try {
+            const result = await ymaps.geocode(trimmed, { results: 1 });
+            if (result.geoObjects.getLength()) {
+              const coords = result.geoObjects.get(0).geometry.getCoordinates();
+              return coords;
+            }
+          } catch (error) {
+            console.warn('Ошибка геокодирования', error);
           }
         }
         return null;
@@ -1278,7 +2026,7 @@
           return;
         }
 
-        const ints = Array.isArray(state.routeData.intersections) ? state.routeData.intersections : [];
+        const ints = Array.isArray(state.routeData?.intersections) ? state.routeData.intersections : [];
         const weightCount = ints.filter((h) => h.zone.type === 'weight').length;
         const platonCount = ints.filter((h) => h.zone.type === 'platon').length;
 
@@ -1288,6 +2036,18 @@
           if (weightCount) parts.push(`весовые: ${weightCount}`);
           if (platonCount) parts.push(`Платон: ${platonCount}`);
           msgs.push(`На маршруте ${ints.length} зон (${parts.join(', ')}).`);
+          const zoneLabels = [];
+          ints.forEach((hit) => {
+            const zone = hit.zone;
+            if (!zone) return;
+            const name = zone.properties?.name || 'Без названия';
+            const typeLabel = zone.type === 'weight' ? 'весовой контроль' : 'Платон';
+            const text = `${name} — ${typeLabel}`;
+            if (!zoneLabels.includes(text)) {
+              zoneLabels.push(text);
+            }
+          });
+          zoneLabels.forEach((label) => msgs.push(label));
         } else {
           msgs.push('Опасных зон на маршруте не обнаружено.');
         }
@@ -1323,6 +2083,8 @@
             weight: elements.weightToggle.checked,
             platon: elements.platonToggle.checked,
             toll: elements.tollToggle.checked,
+            simplify: elements.simplifyToggle ? elements.simplifyToggle.checked : true,
+            mapType: state.mapType,
           };
           localStorage.setItem('truckMapSettings', JSON.stringify(payload));
         } catch (error) {
@@ -1332,6 +2094,9 @@
 
       function restoreUI() {
         try {
+          if (elements.simplifyToggle) {
+            elements.simplifyToggle.checked = true;
+          }
           const raw = localStorage.getItem('truckMapSettings');
           if (!raw) {
             elements.weightToggle.checked = true;
@@ -1343,9 +2108,26 @@
           elements.weightToggle.checked = data.weight !== undefined ? data.weight : true;
           if (typeof data.platon === 'boolean') elements.platonToggle.checked = data.platon;
           if (typeof data.toll === 'boolean') elements.tollToggle.checked = data.toll;
+          if (typeof data.simplify === 'boolean' && elements.simplifyToggle) {
+            elements.simplifyToggle.checked = data.simplify;
+          }
+          if (typeof data.mapType === 'string') {
+            state.mapType = data.mapType;
+            if (elements.mapTypeSelect) {
+              elements.mapTypeSelect.value = data.mapType;
+            }
+          } else if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
+          }
         } catch (error) {
           console.warn('Не удалось восстановить настройки', error);
           elements.weightToggle.checked = true;
+          if (elements.simplifyToggle) {
+            elements.simplifyToggle.checked = true;
+          }
+          if (elements.mapTypeSelect) {
+            elements.mapTypeSelect.value = state.mapType;
+          }
         }
       }
       function formatDistance(value) {
@@ -1359,7 +2141,11 @@
       function formatDuration(value) {
         if (!Number.isFinite(value)) return '—';
         const sign = value < 0 ? -1 : 1;
-        const totalMinutes = Math.round(Math.abs(value) / 60);
+        const absSeconds = Math.abs(value);
+        if (absSeconds < 60) {
+          return sign < 0 ? '-<1 мин' : '<1 мин';
+        }
+        const totalMinutes = Math.round(absSeconds / 60);
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
         const formatted = hours > 0 ? `${hours} ч ${minutes} мин` : `${minutes} мин`;
@@ -1423,6 +2209,13 @@
         const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing));
         const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
         return [toDeg(lat2), normalizeLon(toDeg(lon2))];
+      }
+
+      function reverseBearing(rad) {
+        let x = rad + Math.PI;
+        while (x > Math.PI) x -= 2 * Math.PI;
+        while (x <= -Math.PI) x += 2 * Math.PI;
+        return x;
       }
 
       function projectPointOnSegment(point, start, end) {
