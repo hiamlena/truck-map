@@ -380,6 +380,7 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="loading" hidden>Загрузка...</div>
 
   <button type="button" class="panel-toggle" id="legendToggleBtn">Скрыть легенду</button>
   <button type="button" class="panel-toggle" id="recommendationsToggleBtn">Скрыть рекомендации</button>
@@ -413,7 +414,7 @@
         <label><input type="checkbox" id="weightToggle" checked /> Весовые рамки</label>
         <label><input type="checkbox" id="platonToggle" /> Платон</label>
         <label><input type="checkbox" id="tollToggle" /> Избегать платных дорог</label>
-        <label><input type="checkbox" id="simplifyToggle" /> Упрощённая навигация</label>
+        <label><input type="checkbox" id="simplifyToggle" checked /> Упрощённые шаги</label>
       </div>
       <div class="actions">
         <button type="submit" id="buildRouteBtn">Построить маршрут</button>
@@ -441,6 +442,7 @@
         routeHistory: [],
         weightZones: [],
         platonZones: [],
+        detourList: [],
         voiceQueue: [],
         speaking: false,
         currentStepIndex: 0,
@@ -473,9 +475,51 @@
         legendToggleBtn: document.getElementById('legendToggleBtn'),
         recommendationsToggleBtn: document.getElementById('recommendationsToggleBtn'),
         sheetToggleBtn: document.getElementById('sheetToggleBtn'),
+        loading: document.getElementById('loading'),
       };
 
       let tollWarned = false;
+      let loadingCounter = 0;
+
+      if (elements.loading) {
+        elements.loading.hidden = true;
+        elements.loading.style.display = 'none';
+      }
+
+      function showLoading() {
+        loadingCounter += 1;
+        if (elements.loading) {
+          elements.loading.hidden = false;
+          elements.loading.style.display = 'block';
+        }
+      }
+
+      function hideLoading() {
+        loadingCounter = Math.max(0, loadingCounter - 1);
+        if (loadingCounter === 0 && elements.loading) {
+          elements.loading.style.display = 'none';
+          elements.loading.hidden = true;
+        }
+      }
+
+      function syncDetourList() {
+        state.detourList = [...state.weightZones, ...state.platonZones].filter((zone) => zone.__selected);
+      }
+
+      function applyZoneSelectionStyle(zone) {
+        if (zone && zone.circle) {
+          zone.circle.options.set('strokeWidth', zone.__selected ? 3 : 2);
+          zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+        }
+      }
+
+      function resetZoneSelections() {
+        [...state.weightZones, ...state.platonZones].forEach((zone) => {
+          zone.__selected = false;
+          applyZoneSelectionStyle(zone);
+        });
+        syncDetourList();
+      }
 
       updateRecommendations(true);
 
@@ -532,7 +576,7 @@
         elements.tollToggle.addEventListener('change', () => {
           saveSettings();
           if (elements.tollToggle.checked && !tollWarned) {
-            alert('На публичном сервере OSRM «избегать платных дорог» может не работать. В ссылках на Google Maps режим учитывается.');
+            alert('На публичном OSRM «избегать платных дорог» может игнорироваться. В ссылках Google Maps работает.');
             tollWarned = true;
           }
           if (state.routeData) {
@@ -541,6 +585,7 @@
         });
 
         elements.simplifyToggle?.addEventListener('change', () => {
+          saveSettings();
           if (state.routeData) {
             renderSteps(state.routeData.steps, elements.simplifyToggle.checked);
           }
@@ -621,6 +666,7 @@
                 placemark: null,
                 circle: null,
                 rendered: false,
+                __selected: false,
               };
             });
           zoneCache.set(url, zones);
@@ -631,7 +677,14 @@
       }
 
       function cloneZones(zones) {
-        return zones.map((zone) => ({ ...zone, properties: { ...zone.properties }, placemark: null, circle: null, rendered: false }));
+        return zones.map((zone) => ({
+          ...zone,
+          properties: { ...zone.properties },
+          placemark: null,
+          circle: null,
+          rendered: false,
+          __selected: Boolean(zone.__selected),
+        }));
       }
       function redrawZonesInView() {
         if (!state.map) return;
@@ -664,12 +717,29 @@
             zone.circle = new ymaps.Circle([zone.center, zone.radius], {}, {
               fillColor: zone.fillColor,
               strokeColor: zone.color,
-              strokeWidth: 2,
+              strokeWidth: zone.__selected ? 3 : 2,
+              strokeOpacity: zone.__selected ? 0.9 : 0.6,
               fillOpacity: 0.35,
             });
             state.map.geoObjects.add(zone.circle);
             state.map.geoObjects.add(zone.placemark);
+            const toggleSelection = () => {
+              if (!state.routeData) {
+                alert('Сначала постройте маршрут.');
+                return;
+              }
+              zone.__selected = !zone.__selected;
+              applyZoneSelectionStyle(zone);
+              syncDetourList();
+              const label = zone.properties?.name || 'Без названия';
+              console.log(`Зона для объезда: ${label} (${zone.__selected ? 'выбрана' : 'снята'})`);
+            };
+            zone.circle.events.add('click', toggleSelection);
+            zone.placemark.events.add('click', toggleSelection);
+            applyZoneSelectionStyle(zone);
             zone.rendered = true;
+          } else if (shouldRender && zone.rendered) {
+            applyZoneSelectionStyle(zone);
           } else if (!shouldRender && zone.rendered) {
             if (zone.circle) state.map.geoObjects.remove(zone.circle);
             if (zone.placemark) state.map.geoObjects.remove(zone.placemark);
@@ -685,6 +755,7 @@
 
       function applyZoneVisibility() {
         redrawZonesInView();
+        syncDetourList();
       }
 
       function buildBalloon(props) {
@@ -702,6 +773,7 @@
         return lines.join('<br />');
       }
       async function buildRoute(options = {}) {
+        showLoading();
         try {
           const fromValue = options.from ?? elements.fromInput.value.trim();
           const toValue = options.to ?? elements.toInput.value.trim();
@@ -747,6 +819,7 @@
 
           state.activeRouteKind = 'main';
           clearDetour();
+          resetZoneSelections();
 
           renderRoute(routeData.path, coordsList);
           renderSteps(routeData.steps, elements.simplifyToggle?.checked);
@@ -755,6 +828,8 @@
         } catch (error) {
           console.warn(error);
           alert(error && error.message ? error.message : 'Не удалось построить маршрут. Попробуйте ещё раз.');
+        } finally {
+          hideLoading();
         }
       }
 
@@ -799,6 +874,8 @@
               text: step.maneuver.instruction || formatStep(step),
               distance: step.distance,
               duration: step.duration,
+              name: step.name || '',
+              maneuver: step.maneuver || null,
             });
           });
         });
@@ -810,61 +887,85 @@
         };
       }
       async function handleDetour() {
+        showLoading();
         try {
-          if (!state.routeData) { alert('Сначала постройте маршрут.'); return; }
+          if (!state.routeData) {
+            alert('Сначала постройте маршрут.');
+            return;
+          }
 
-          const ints = state.routeData.intersections || [];
-          if (!ints.length) { alert('Зоны на маршруте не обнаружены.'); return; }
+          const baseRoute = state.routeData;
+          const path = Array.isArray(baseRoute.path) ? baseRoute.path : [];
+          if (path.length < 2) {
+            alert('Недостаточно данных маршрута для расчёта объезда.');
+            return;
+          }
 
-          const viaCandidates = ints.map((hit) => {
-            const offsetMeters = (hit.zone.radius || 400) * 1.3;
-            return getOffsetPoint(hit.point, hit.zone.center, offsetMeters);
-          }).filter(Boolean);
+          const selectedZones = Array.isArray(state.detourList) && state.detourList.length
+            ? state.detourList.slice()
+            : (baseRoute.intersections || []).map((hit) => hit.zone).filter(Boolean);
 
-          if (!viaCandidates.length) { alert('Не удалось вычислить точки объезда.'); return; }
+          const uniqueZones = [];
+          const zoneSet = new Set();
+          selectedZones.forEach((zone) => {
+            if (zone && !zoneSet.has(zone)) {
+              zoneSet.add(zone);
+              uniqueZones.push(zone);
+            }
+          });
+
+          if (!uniqueZones.length) {
+            alert('Зоны на маршруте не обнаружены.');
+            return;
+          }
+
+          const viaCandidates = [];
+          uniqueZones.forEach((zone) => {
+            if (!zone || !Array.isArray(zone.center)) return;
+            let closest = null;
+            for (let i = 0; i < path.length - 1; i += 1) {
+              const start = path[i];
+              const end = path[i + 1];
+              const projection = projectPointOnSegment(zone.center, start, end);
+              if (!projection) continue;
+              if (!closest || projection.distance < closest.distance) {
+                closest = { ...projection };
+              }
+            }
+            if (closest) {
+              const radius = Number(zone.radius) || 0;
+              const offset = radius * 0.8 + 300;
+              const bearing = bearingBetween(closest.point, zone.center);
+              const viaPoint = destinationPoint(closest.point, reverseBearing(bearing), offset);
+              if (!viaCandidates.some((existing) => nearlyEqualPoints(existing, viaPoint))) {
+                viaCandidates.push(viaPoint);
+              }
+            }
+          });
+
+          if (!viaCandidates.length) {
+            alert('Не удалось вычислить точки объезда.');
+            return;
+          }
 
           const via = selectEvenly(viaCandidates, 6);
-          const start = state.routeData.coordsList[0];
-          const finish = state.routeData.coordsList[state.routeData.coordsList.length - 1];
+          console.log('ИИ-объезд via-точки:', via);
 
-          const alt = await requestRoute([start, ...via, finish], elements.tollToggle.checked);
-
-          if (!alt) { alert('Альтернативный маршрут не найден.'); return; }
-
-          drawDetour(alt.path);
-          state.activeRouteKind = 'detour';
-
-          const deltaLen = alt.distance - state.routeData.distance;
-          const deltaDur = alt.duration - state.routeData.duration;
-          const msg = [
-            'Построен альтернативный (объездной) маршрут.',
-            `Разница: ${deltaLen >= 0 ? '+' : ''}${formatDistance(deltaLen)} / ${deltaDur >= 0 ? '+' : ''}${formatDuration(deltaDur)}.`,
-            'Применить объезд вместо основного?'
-          ].join('\n');
-
-          if (confirm(msg)) {
-            state.routeHistory.push(state.routeData);
-            state.routeData = {
-              coordsList: [start, ...via, finish],
-              path: alt.path,
-              distance: alt.distance,
-              duration: alt.duration,
-              steps: alt.steps,
-              intersections: detectIntersections(alt.path),
-            };
-            clearDetour();
-            renderRoute(state.routeData.path, state.routeData.coordsList);
-            renderSteps(state.routeData.steps, elements.simplifyToggle?.checked);
-            speakSteps(state.routeData.steps);
-            updateRecommendations();
-          } else {
-            state.activeRouteKind = 'main';
+          const coordsList = Array.isArray(baseRoute.coordsList) ? baseRoute.coordsList : [];
+          if (coordsList.length < 2) {
+            alert('Не удалось определить точки маршрута.');
+            return;
           }
+
+          const start = coordsList[0];
+          const finish = coordsList[coordsList.length - 1];
+
+          await buildRoute({ from: start, to: finish, via });
         } catch (error) {
           console.warn('Ошибка построения объезда', error);
           alert('Не удалось построить альтернативный маршрут. Попробуйте позже.');
-          clearDetour();
-          state.activeRouteKind = 'main';
+        } finally {
+          hideLoading();
         }
       }
 
@@ -932,68 +1033,168 @@
           return;
         }
 
-        const prepared = steps.map((s, idx) => ({
-          text: (s.text || '').trim(),
-          distance: Number(s.distance) || 0,
-          duration: Number(s.duration) || 0,
-          originalIndex: idx,
-          indices: [idx],
-        }));
+        const noiseTypes = new Set(['depart', 'arrive', 'new name', 'end of road']);
 
-        const important = prepared.filter((s) => {
-          const t = s.text.toLowerCase();
-          if (t.includes('depart') || t.includes('arrive') || t.includes('new name')) return false;
-          if (s.distance < 120) return false;
-          return true;
+        const prepared = steps.map((step, idx) => {
+          const ref = step || {};
+          const localized = getLocalizedInstruction(ref);
+          ref.localizedText = localized || (ref.text || '').trim();
+          const type = (ref.maneuver?.type || ref.type || '').toLowerCase();
+          return {
+            originalIndex: idx,
+            type,
+            distance: Number(ref.distance) || 0,
+            duration: Number(ref.duration) || 0,
+            displayText: ref.localizedText || 'Двигайтесь прямо',
+          };
         });
 
-        const dedup = important.reduce((acc, s) => {
-          if (!acc.length || acc[acc.length - 1].text !== s.text) {
-            acc.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
+        const filtered = prepared.filter((item) => {
+          if (noiseTypes.has(item.type)) return false;
+          const original = steps[item.originalIndex] || {};
+          const text = (original.text || '').toLowerCase();
+          if (!item.type && (text.includes('depart') || text.includes('arrive') || text.includes('new name') || text.includes('end of road'))) {
+            return false;
           }
-          return acc;
-        }, []);
+          if ((item.type === 'roundabout' || item.type === 'rotary' || item.type === 'roundabout turn') && item.distance < 80) return false;
+          if (simplify && item.distance < 120) return false;
+          return Boolean(item.displayText);
+        });
 
-        const final = !simplify ? dedup : (() => {
-          const out = [];
-          let buf = null;
-          for (const s of dedup) {
-            if (s.distance < 500) {
-              if (!buf) {
-                buf = { ...s, indices: [...(s.indices || [s.originalIndex])] };
-              } else {
-                buf.text += ` → ${s.text}`;
-                buf.distance += s.distance;
-                buf.duration += s.duration;
-                buf.indices.push(...(s.indices || [s.originalIndex]));
-              }
-            } else {
-              if (buf) {
-                out.push(buf);
-                buf = null;
-              }
-              out.push({ ...s, indices: [...(s.indices || [s.originalIndex])] });
-            }
+        const merged = [];
+        filtered.forEach((item) => {
+          const last = merged[merged.length - 1];
+          if (last && last.displayText === item.displayText) {
+            last.distance += item.distance;
+            last.duration += item.duration;
+            last.indices.push(item.originalIndex);
+          } else {
+            merged.push({
+              displayText: item.displayText,
+              distance: item.distance,
+              duration: item.duration,
+              indices: [item.originalIndex],
+            });
           }
-          if (buf) out.push(buf);
-          return out;
-        })();
+        });
 
-        for (let i = 0; i < final.length; i += 1) {
-          const s = final[i];
-          const li = document.createElement('li');
-          const txt = s.text.replace(/depart|arrive/gi, '').trim() || 'Двигайтесь';
-          li.textContent = `${txt} (${formatDistance(s.distance)}, ${formatDuration(s.duration)})`;
-          const indices = Array.isArray(s.indices) && s.indices.length ? s.indices : [s.originalIndex ?? i];
-          li.dataset.originalIndex = String(indices[0]);
-          li.dataset.originalIndices = indices.join(',');
-          li.dataset.listIndex = String(i);
-          list.appendChild(li);
+        if (!merged.length) {
+          elements.stepsBlock.hidden = true;
+          return;
         }
 
-        elements.stepsBlock.hidden = final.length === 0;
-        if (!elements.stepsBlock.hidden) {
-          list.firstElementChild?.classList.add('active');
+        merged.forEach((item, idx) => {
+          const li = document.createElement('li');
+          li.textContent = `${item.displayText} (${formatDistance(item.distance)}, ${formatDuration(item.duration)})`;
+          const indices = item.indices && item.indices.length ? item.indices : [idx];
+          li.dataset.originalIndex = String(indices[0]);
+          li.dataset.originalIndices = indices.join(',');
+          li.dataset.listIndex = String(idx);
+          list.appendChild(li);
+        });
+
+        elements.stepsBlock.hidden = false;
+        list.firstElementChild?.classList.add('active');
+      }
+
+      function getLocalizedInstruction(step) {
+        if (!step) return '';
+        const rawText = (step.text || '').trim();
+        const maneuver = step.maneuver || {};
+        const type = (maneuver.type || step.type || '').toLowerCase();
+        const modifier = (maneuver.modifier || step.modifier || '').toLowerCase();
+        const name = (step.name || '').trim();
+        const exit = maneuver.exit;
+        const roadOn = name ? ` на ${name}` : '';
+        const roadAlong = name ? ` по ${name}` : '';
+
+        switch (type) {
+          case 'turn': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Поверните ${dir}${roadOn}` : `Поверните${roadOn}`;
+          }
+          case 'fork': {
+            const lane = getLaneDirection(modifier);
+            return lane ? `Держитесь ${lane}${roadAlong}` : `Держитесь${roadAlong}`;
+          }
+          case 'merge': {
+            const lane = getLaneDirection(modifier);
+            return lane ? `Перестройтесь ${lane}${roadAlong}` : `Перестройтесь${roadAlong}`;
+          }
+          case 'off ramp':
+          case 'on ramp':
+          case 'ramp':
+          case 'exit': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Съезд ${dir}${roadOn}` : `Съезд${roadOn}`;
+          }
+          case 'roundabout':
+          case 'roundabout turn':
+          case 'rotary': {
+            const exitText = exit ? `${exit}-й съезд` : 'нужный съезд';
+            return `На кольцевой развязке используйте ${exitText}${roadOn}`;
+          }
+          case 'continue': {
+            if (modifier === 'uturn') return `Развернитесь${roadOn}`;
+            if (modifier === 'straight' || !modifier) {
+              return `Продолжайте движение${roadAlong}`;
+            }
+            const lane = getLaneDirection(modifier);
+            if (lane) return `Продолжайте движение, держитесь ${lane}${roadAlong}`;
+            const dir = getDirectionText(modifier);
+            return dir ? `Продолжайте движение ${dir}${roadAlong}` : `Продолжайте движение${roadAlong}`;
+          }
+          default:
+            break;
+        }
+
+        if (rawText) return rawText;
+        return name ? `Двигайтесь по ${name}` : '';
+      }
+
+      function getDirectionText(modifier) {
+        switch (modifier) {
+          case 'left':
+            return 'налево';
+          case 'right':
+            return 'направо';
+          case 'sharp_left':
+            return 'резко налево';
+          case 'sharp_right':
+            return 'резко направо';
+          case 'slight_left':
+            return 'плавно налево';
+          case 'slight_right':
+            return 'плавно направо';
+          case 'straight':
+            return 'прямо';
+          case 'uturn':
+            return 'на разворот';
+          default:
+            return '';
+        }
+      }
+
+      function getLaneDirection(modifier) {
+        switch (modifier) {
+          case 'left':
+            return 'левее';
+          case 'right':
+            return 'правее';
+          case 'slight_left':
+            return 'плавно левее';
+          case 'slight_right':
+            return 'плавно правее';
+          case 'sharp_left':
+            return 'резко левее';
+          case 'sharp_right':
+            return 'резко правее';
+          case 'straight':
+            return 'прямо';
+          default:
+            return '';
         }
       }
 
@@ -1022,6 +1223,11 @@
         if (!('speechSynthesis' in window) || !steps || !steps.length) {
           return;
         }
+        steps.forEach((step) => {
+          if (!step) return;
+          const localized = getLocalizedInstruction(step);
+          step.localizedText = localized || (step.text || '').trim();
+        });
         window.speechSynthesis.cancel();
         state.voiceQueue = steps.slice();
         state.speaking = false;
@@ -1039,7 +1245,7 @@
         if (index >= 0) {
           setActiveStep(index);
         }
-        const utterance = new SpeechSynthesisUtterance(step.text);
+        const utterance = new SpeechSynthesisUtterance(step.localizedText || step.text);
         utterance.lang = 'ru-RU';
         utterance.rate = 1;
         state.speaking = true;
@@ -1054,6 +1260,7 @@
           state.map.geoObjects.remove(state.routeLine);
           state.routeLine = null;
         }
+        resetZoneSelections();
         clearDetour();
         state.activeRouteKind = 'main';
         state.routeMarkers.forEach((marker) => state.map.geoObjects.remove(marker));
@@ -1323,6 +1530,7 @@
             weight: elements.weightToggle.checked,
             platon: elements.platonToggle.checked,
             toll: elements.tollToggle.checked,
+            simplify: elements.simplifyToggle ? elements.simplifyToggle.checked : true,
           };
           localStorage.setItem('truckMapSettings', JSON.stringify(payload));
         } catch (error) {
@@ -1332,6 +1540,9 @@
 
       function restoreUI() {
         try {
+          if (elements.simplifyToggle) {
+            elements.simplifyToggle.checked = true;
+          }
           const raw = localStorage.getItem('truckMapSettings');
           if (!raw) {
             elements.weightToggle.checked = true;
@@ -1343,9 +1554,15 @@
           elements.weightToggle.checked = data.weight !== undefined ? data.weight : true;
           if (typeof data.platon === 'boolean') elements.platonToggle.checked = data.platon;
           if (typeof data.toll === 'boolean') elements.tollToggle.checked = data.toll;
+          if (typeof data.simplify === 'boolean' && elements.simplifyToggle) {
+            elements.simplifyToggle.checked = data.simplify;
+          }
         } catch (error) {
           console.warn('Не удалось восстановить настройки', error);
           elements.weightToggle.checked = true;
+          if (elements.simplifyToggle) {
+            elements.simplifyToggle.checked = true;
+          }
         }
       }
       function formatDistance(value) {
@@ -1359,7 +1576,11 @@
       function formatDuration(value) {
         if (!Number.isFinite(value)) return '—';
         const sign = value < 0 ? -1 : 1;
-        const totalMinutes = Math.round(Math.abs(value) / 60);
+        const absSeconds = Math.abs(value);
+        if (absSeconds < 60) {
+          return sign < 0 ? '-<1 мин' : '<1 мин';
+        }
+        const totalMinutes = Math.round(absSeconds / 60);
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
         const formatted = hours > 0 ? `${hours} ч ${minutes} мин` : `${minutes} мин`;
@@ -1423,6 +1644,13 @@
         const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing));
         const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
         return [toDeg(lat2), normalizeLon(toDeg(lon2))];
+      }
+
+      function reverseBearing(rad) {
+        let x = rad + Math.PI;
+        while (x > Math.PI) x -= 2 * Math.PI;
+        while (x <= -Math.PI) x += 2 * Math.PI;
+        return x;
       }
 
       function projectPointOnSegment(point, start, end) {
