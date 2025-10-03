@@ -626,11 +626,33 @@
       function wireSuggestSafe(inputEl) {
         // безопасно подключаем подсказки: используем SuggestView, если доступен, иначе — фолбэк
         try {
-          if (ymaps.SuggestView && typeof ymaps.SuggestView === 'function') {
-            // штатный SuggestView с ограничением количества результатов
-            new ymaps.SuggestView(inputEl.id, { results: 8 });
-            return;
-          }
+          function wireSuggestSafe(inputEl) {
+  let timer = null;
+  inputEl.addEventListener('input', () => {
+    clearTimeout(timer);
+    const query = inputEl.value.trim();
+    if (query.length < 3) return;
+    timer = setTimeout(async () => {
+      try {
+        const suggestions = await ymaps.suggest(query);
+        if (Array.isArray(suggestions) && suggestions.length) {
+          console.log('Подсказки:', suggestions.map(s => s.value));
+          // можно сюда встроить выпадающий список для выбора
+        }
+      } catch (err) {
+        console.warn('ymaps.suggest error:', err);
+      }
+    }, 300);
+  });
+
+  inputEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('buildRouteBtn')?.click();
+    }
+  });
+}
+
         } catch (error) {
           console.warn('SuggestView недоступен:', error);
         }
