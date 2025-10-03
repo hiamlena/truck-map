@@ -918,7 +918,7 @@
           clearDetour();
           resetZoneSelections();
 
-          renderRoute(routeData.path, coordsList);
+          renderRoute(routeData.path, coordsList, isDetour ? 'detour' : 'main');
           if (isDetour) {
             drawDetour(routeData.path); // подсвечиваем объезд отдельным штрихом
           }
@@ -1073,8 +1073,8 @@
         }
       }
 
-      function renderRoute(path, coordsList) {
-        state.activeRouteKind = 'main';
+      function renderRoute(path, coordsList, kind = 'main') {
+        state.activeRouteKind = kind; // фиксируем тип текущего маршрута (основной или объездной)
         if (state.routeLine) {
           state.map.geoObjects.remove(state.routeLine);
         }
