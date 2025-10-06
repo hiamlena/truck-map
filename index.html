@@ -138,7 +138,7 @@
       loading: byId('loading'), mapModeSelect: byId('mapModeSelect'),
     };
 
-    let tollWarned = false, loadingCounter = 0;
+    let __zoneCounter = 0; // счётчик, чтобы каждая зона имела уникальный ID
     const zoneCache = new Map();
     let zoneIdSeq = 1; // CHANGE: уникальные id для кнопок в балунах
 
@@ -226,44 +226,63 @@
     }
 
     // -------- Зоны
-    async function loadZonesLazy(){
-      if(!state.map) return;
-      await Promise.all([
-        loadGeoJson('weigh_frames.geojson', { color:'#ff3b30', fillColor:'rgba(255,59,48,0.18)', defaultRadius:500, target:state.weightZones, type:'weight' }),
-        loadGeoJson('platon.geojson',       { color:'#ff9500', fillColor:'rgba(255,149,0,0.18)', defaultRadius:300, target:state.platonZones, type:'platon' }),
-      ]);
-      redrawZonesInView();
+    async function loadGeoJson(url, opt){
+  try{
+    // если уже грузили этот файл — берём из кэша
+    if (zoneCache.has(url)) {
+      opt.target.splice(0, opt.target.length, ...cloneZones(zoneCache.get(url)));
+      return;
     }
 
-    async function loadGeoJson(url, opt){
-      try{
-        if(zoneCache.has(url)){ opt.target.splice(0,opt.target.length, ...cloneZones(zoneCache.get(url))); return; }
-        const res = await fetch(url); if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json(); if(!Array.isArray(data.features)) return;
-        const zones = data.features.filter(f=>f.geometry && f.geometry.type==='Point').map(f=>{
-          const [lon,lat] = f.geometry.coordinates;
-          const props = f.properties||{};
-          return {
-            __id: zoneIdSeq++, // CHANGE: id для балуна
-            type: opt.type,
-            center: [lat,lon],
-            radius: Number(props.radius_m) || opt.defaultRadius,
-            color: opt.color,
-            fillColor: opt.fillColor,
-            properties: {
-              name: props.name || 'Без названия',
-              road: props.road || '',
-              km: props.km || '',
-              note: props.note || '',
-            },
-            placemark:null, circle:null, rendered:false, __selected:false, __intersects:true
-          };
-        });
-        zoneCache.set(url, zones);
-        opt.target.splice(0,opt.target.length, ...cloneZones(zones));
-      }catch(e){ console.warn('Ошибка загрузки GeoJSON', url, e); }
-    }
-    function cloneZones(zs){ return zs.map(z=>({...z, properties:{...z.properties}, placemark:null, circle:null, rendered:false, __selected:Boolean(z.__selected), __intersects:z.__intersects!==false })); }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    if (!Array.isArray(data.features)) return;
+
+    const zones = data.features
+      .filter(f => f.geometry && f.geometry.type === 'Point')
+      .map(f => {
+        const [lon, lat] = f.geometry.coordinates;
+        const props = f.properties || {};
+        return {
+          __id: ++__zoneCounter,                 // ← оставляем только один уникальный ID
+          type: opt.type,
+          center: [lat, lon],
+          radius: Number(props.radius_m) || opt.defaultRadius,
+          color: opt.color,
+          fillColor: opt.fillColor,
+          properties: {
+            name: props.name || 'Без названия',
+            road: props.road || '',
+            km: props.km || '',
+            note: props.note || '',
+          },
+          placemark: null,
+          circle: null,
+          rendered: false,
+          __selected: false,
+          __intersects: true,
+        };
+      });
+
+    zoneCache.set(url, zones);
+    opt.target.splice(0, opt.target.length, ...cloneZones(zones));
+  } catch (e) {
+    console.warn('Ошибка загрузки GeoJSON', url, e);
+  }
+}
+    function cloneZones(zs){
+  return zs.map(z => ({
+    ...z,
+    properties: { ...z.properties },
+    placemark: null,
+    circle: null,
+    rendered: false,
+    __selected: Boolean(z.__selected),
+    __intersects: z.__intersects !== false,
+  }));
+}
 
     // CHANGE: HTML балуна с кнопкой
     function buildBalloon(zone){
@@ -305,10 +324,16 @@
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
 
           // CHANGE: привязываем обработчик кнопки при открытии балуна
-          const attach = (geo, z)=> geo.events.add('balloonopen', ()=>{
-            const btn = document.getElementById(`detourBtn_${z.__id}`);
-            if(btn){ btn.onclick = ()=> toggleZoneDetour(z); }
-          });
+       const attach = (geo, z) => geo.events.add('balloonopen', () => {
+  const btn = document.getElementById(`detourBtn_${z.__id}`);
+  if (btn) {
+    btn.onclick = () => {
+      toggleZoneDetour(z);   // переключаем зону
+      handleDetour();        // и СРАЗУ перестраиваем альтернативный маршрут
+    };
+  }
+});
+
           attach(zone.placemark, zone);
           attach(zone.circle, zone);
 
@@ -317,8 +342,9 @@
           // обновим стиль (толщина/прозрачность) и контент балуна (текст кнопки)
           if(zone.circle){
             zone.circle.options.set('strokeWidth', zone.__selected?3:2);
-            zone.circle.options.set('strokeOpacity', zone.__selected?.9:.6);
-            zone.circle.options.set('fillOpacity', zone.__selected?.45:.35);
+            zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+            zone.circle.options.set('fillOpacity', zone.__selected ? 0.45 : 0.35);
+
             zone.circle.properties.set('balloonContent', buildBalloon(zone)); // CHANGE
           }
           if(zone.placemark){
@@ -341,14 +367,18 @@
       zone.__selected = !zone.__selected;
       if(zone.circle){
         zone.circle.options.set('strokeWidth', zone.__selected?3:2);
-        zone.circle.options.set('strokeOpacity', zone.__selected?.9:.6);
-        zone.circle.options.set('fillOpacity', zone.__selected?.45:.35);
+        zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+        zone.circle.options.set('fillOpacity',  zone.__selected ? 0.45 : 0.35);
+
       }
       syncDetourList();
       updateRecommendations();
-      // Обновим кнопку в текущем открытом балуне
-      if(zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
-      if(zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+     // Обновим кнопку в текущем открытом балуне
+if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
+if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+
+// Сразу перестроим маршрут (подстраховка, если переключили не через кнопку)
+handleDetour();
     }
 
     function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
