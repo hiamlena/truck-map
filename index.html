@@ -225,17 +225,60 @@
       applyZoneVisibility();
     }
 
-   function bindEvents(){
-  elements.form.addEventListener('submit', e=>{ e.preventDefault(); buildRoute(); });
-  elements.detourBtn.addEventListener('click', handleDetour);
-  elements.clearBtn.addEventListener('click', clearRoute);
-  elements.shareBtn.addEventListener('click', shareRoute);
+function bindEvents() {
+  // Проверяем наличие элементов перед привязкой событий
+  const safeAddEvent = (el, event, handler) => {
+    if (el && el.addEventListener) el.addEventListener(event, handler);
+  };
 
-  elements.mapModeSelect?.addEventListener('change', ()=>{
-    if(!state.map) return;
+  safeAddEvent(elements.form, 'submit', e => { e.preventDefault(); buildRoute(); });
+  safeAddEvent(elements.detourBtn, 'click', handleDetour);
+  safeAddEvent(elements.clearBtn, 'click', clearRoute);
+  safeAddEvent(elements.shareBtn, 'click', shareRoute);
+
+  safeAddEvent(elements.mapModeSelect, 'change', () => {
+    if (!state.map) return;
     applyMapMode(elements.mapModeSelect.value);
     saveSettings();
   });
+
+  safeAddEvent(elements.weightToggle, 'change', () => {
+    saveSettings();
+    applyZoneVisibility();
+    if (state.routeData) {
+      state.routeData.intersections = detectIntersections(state.routeData.path);
+      markRouteIntersections(state.routeData.intersections || []);
+      updateRecommendations();
+    }
+  });
+  safeAddEvent(elements.platonToggle, 'change', () => {
+    saveSettings();
+    applyZoneVisibility();
+    if (state.routeData) {
+      state.routeData.intersections = detectIntersections(state.routeData.path);
+      markRouteIntersections(state.routeData.intersections || []);
+      updateRecommendations();
+    }
+  });
+  safeAddEvent(elements.tollToggle, 'change', () => {
+    saveSettings();
+    if (elements.tollToggle.checked && !tollWarned) {
+      alert('На публичном OSRM «избегать платных дорог» может игнорироваться. В ссылках Google/Яндекс режим учитывается.');
+      tollWarned = true;
+    }
+    if (state.routeData) updateRecommendations();
+  });
+
+  safeAddEvent(elements.fromInput, 'input', debounce(saveSettings, 400));
+  safeAddEvent(elements.toInput, 'input', debounce(saveSettings, 400));
+
+  safeAddEvent(elements.legendToggleBtn, 'click', () => togglePanel(elements.legend, elements.legendToggleBtn, 'легенду'));
+  safeAddEvent(elements.recommendationsToggleBtn, 'click', () => togglePanel(elements.recommendations, elements.recommendationsToggleBtn, 'рекомендации'));
+  safeAddEvent(elements.sheetToggleBtn, 'click', () => togglePanel(elements.sheet, elements.sheetToggleBtn, 'панель'));
+
+  if (state.map) state.map.events.add('boundschange', debounce(redrawZonesInView, 250));
+  setupResponsivePanels();
+}
 
   elements.weightToggle.addEventListener('change', ()=>{
     saveSettings(); applyZoneVisibility();
@@ -410,30 +453,32 @@
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
 
           // CHANGE: надёжная привязка кнопки при открытии балуна
-          const attach = (geo, z) => geo.events.add('balloonopen', () => {
-            let attempts = 0;
-            const tryBind = () => {
-              try {
-                const btn = document.getElementById(`detourBtn_${z.__id}`);
-                if (btn) {
-                  btn.onclick = () => {
-                    try {
-                      toggleZoneDetour(z);   // переключаем флаг и стиль
-                      handleDetour();        // и сразу перестраиваем маршрут
-                    } catch (err) {
-                      console.warn('Detour click handler error:', err);
-                    }
-                  };
-                } else if (attempts < 4) {
-                  attempts += 1;
-                  setTimeout(tryBind, 60);
-                }
-              } catch (e) {
-                console.warn('attach(balloonopen) error:', e);
-              }
-            };
-            tryBind();
-          });
+       const attach = (geo, z) => geo.events.add('balloonopen', () => {
+  let attempts = 0;
+  const tryBind = () => {
+    try {
+      const btn = document.getElementById(`detourBtn_${z.__id}`);
+      if (btn) {
+        btn.onclick = () => {
+          try {
+            toggleZoneDetour(z);   // переключаем флаг и стиль
+            handleDetour();        // и сразу перестраиваем маршрут
+          } catch (err) {
+            console.warn('Detour click handler error:', err);
+          }
+        };
+      } else if (attempts < 4) {
+        attempts += 1;
+        setTimeout(tryBind, 60);
+      } else {
+        console.warn('Button not found after retries:', `detourBtn_${z.__id}`);
+      }
+    } catch (e) {
+      console.warn('attach(balloonopen) error:', e);
+    }
+  };
+  tryBind();
+});
           attach(zone.placemark, zone);
           attach(zone.circle, zone);
 
@@ -459,21 +504,25 @@
       state.platonZones.forEach(z=>process(z, showPlaton));
     }
 
-    function toggleZoneDetour(zone){
-      if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
-      zone.__selected = !zone.__selected;
-      if(zone.circle){
-        zone.circle.options.set('strokeWidth', zone.__selected?3:2);
-        zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
-        zone.circle.options.set('fillOpacity',  zone.__selected ? 0.45 : 0.35);
-      }
-      syncDetourList();
-      updateRecommendations();
-      // CHANGE: обновить балун (текст кнопки)
-      if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
-      if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
-    }
-
+ function toggleZoneDetour(zone) {
+  if (!state.routeData) { alert('Сначала постройте маршрут.'); return; }
+  zone.__selected = !zone.__selected;
+  console.log('Toggled zone:', zone, 'Selected:', zone.__selected); // Отладка
+  if (zone.circle) {
+    zone.circle.options.set('strokeWidth', zone.__selected ? 3 : 2);
+    zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+    zone.circle.options.set('fillOpacity', zone.__selected ? 0.45 : 0.35);
+  }
+  syncDetourList();
+  updateRecommendations();
+  // Обновление текста кнопки в открытом балуне
+  if (zone.circle?.balloon?.isOpen()) {
+    zone.circle.properties.set('balloonContent', buildBalloon(zone));
+  }
+  if (zone.placemark?.balloon?.isOpen()) {
+    zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+  }
+}
     function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
     function syncDetourList(){
       const selected = [...state.weightZones, ...state.platonZones].filter(z=>z && z.__selected);
