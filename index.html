@@ -449,33 +449,232 @@
       setupResponsivePanels();
     }
 
-    // -------- Zones (безопасные заглушки: если файлов нет — тихо)
-    async function loadZonesLazy() {
-      // Если у тебя есть файлы weigh_frames.geojson / platon.geojson в корне — добавь сюда загрузку.
-      // Сейчас стоим «пустыми», чтобы ничего не падало.
-      redrawZonesInView();
-    }
+   // -------- Zones (реальная подгрузка и отрисовка)
+async function loadZonesLazy() {
+  if (!state.map) return;
+  const requests = [
+    loadGeoJson('weigh_frames.geojson', {
+      color: '#ff3b30',
+      fillColor: 'rgba(255, 59, 48, 0.18)',
+      defaultRadius: 500,
+      target: state.weightZones,
+      type: 'weight',
+    }),
+    loadGeoJson('platon.geojson', {
+      color: '#ff9500',
+      fillColor: 'rgba(255, 149, 0, 0.18)',
+      defaultRadius: 300,
+      target: state.platonZones,
+      type: 'platon',
+    }),
+  ];
+  await Promise.all(requests);
+  redrawZonesInView();
+}
 
-    function redrawZonesInView() {
-      // если появятся круги зон — тут их перерисуем по bounds; сейчас — безопасно пусто
+async function loadGeoJson(url, options) {
+  try {
+    if (zoneCache.has(url)) {
+      options.target.splice(0, options.target.length, ...cloneZones(zoneCache.get(url)));
+      return;
     }
-    function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
-    function syncDetourList(){ state.detourList = [...state.weightZones, ...state.platonZones].filter(z => z && z.__selected); }
-    function markRouteIntersections(hits){
-      const zones = [...state.weightZones, ...state.platonZones];
-      zones.forEach((z) => { z.__intersects = false; });
-      (hits || []).forEach((h) => { if (h?.zone) h.zone.__intersects = true; });
-      redrawZonesInView();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.features)) return;
+
+    const zones = data.features
+      .filter(f => f.geometry && f.geometry.type === 'Point')
+      .map(f => {
+        const [lon, lat] = f.geometry.coordinates;
+        const props = f.properties || {};
+        const radius = Number(props.radius_m) || options.defaultRadius;
+        return {
+          type: options.type,
+          center: [lat, lon],
+          radius,
+          color: options.color,
+          fillColor: options.fillColor,
+          properties: {
+            name: props.name || 'Без названия',
+            road: props.road || '',
+            km: props.km || '',
+            note: props.note || '',
+          },
+          placemark: null,
+          circle: null,
+          rendered: false,
+          __selected: false,
+          __intersects: true,
+        };
+      });
+    zoneCache.set(url, zones);
+    options.target.splice(0, options.target.length, ...cloneZones(zones));
+  } catch (e) {
+    console.warn('Ошибка загрузки GeoJSON', url, e);
+  }
+}
+
+function cloneZones(zones) {
+  return zones.map(z => ({
+    ...z,
+    properties: { ...z.properties },
+    placemark: null,
+    circle: null,
+    rendered: false,
+    __selected: Boolean(z.__selected),
+    __intersects: z.__intersects !== false,
+  }));
+}
+
+function buildBalloon(props) {
+  const lines = [];
+  lines.push(`<strong>${escapeHtml(props.name)}</strong>`);
+  const roadParts = [];
+  if (props.road) roadParts.push(escapeHtml(props.road));
+  if (props.km) roadParts.push(`км ${escapeHtml(String(props.km))}`);
+  if (roadParts.length) lines.push(roadParts.join(', '));
+  if (props.note) lines.push(`Объезд: ${escapeHtml(props.note)}`);
+  return lines.join('<br/>');
+}
+
+function redrawZonesInView() {
+  if (!state.map) return;
+  const bounds = state.map.getBounds();
+  if (!bounds) return;
+  const [[southLat, westLon], [northLat, eastLon]] = bounds;
+  const minLat = Math.min(southLat, northLat);
+  const maxLat = Math.max(southLat, northLat);
+  const minLon = Math.min(westLon, eastLon);
+  const maxLon = Math.max(westLon, eastLon);
+  const inBounds = ([lat, lon]) => lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
+
+  const showWeight = elements.weightToggle?.checked;
+  const showPlaton = elements.platonToggle?.checked;
+  const restrictByRoute = Boolean(state.routeData);
+
+  const processZone = (zone, visible) => {
+    const intersectsRoute = !restrictByRoute || zone.__intersects;
+    const shouldRender = visible && intersectsRoute && inBounds(zone.center);
+
+    if (shouldRender && !zone.rendered) {
+      const balloon = buildBalloon(zone.properties);
+      zone.placemark = new ymaps.Placemark(
+        zone.center,
+        { balloonContent: balloon, hintContent: zone.properties.name },
+        { preset: 'islands#dotIcon', iconColor: zone.color }
+      );
+      zone.circle = new ymaps.Circle([zone.center, zone.radius], {}, {
+        fillColor: zone.fillColor,
+        strokeColor: zone.color,
+        strokeWidth: zone.__selected ? 3 : 2,
+        strokeOpacity: zone.__selected ? 0.9 : 0.6,
+        fillOpacity: 0.35,
+      });
+      state.map.geoObjects.add(zone.circle);
+      state.map.geoObjects.add(zone.placemark);
+
+      const onToggle = () => {
+        if (!state.routeData) { alert('Сначала постройте маршрут.'); return; }
+        zone.__selected = !zone.__selected;
+        if (zone.circle) {
+          zone.circle.options.set('strokeWidth', zone.__selected ? 3 : 2);
+          zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+        }
+        syncDetourList();
+      };
+      zone.circle.events.add('click', onToggle);
+      zone.placemark.events.add('click', onToggle);
+
+      zone.rendered = true;
+    } else if (shouldRender && zone.rendered) {
+      // просто освежим стиль выбора
+      if (zone.circle) {
+        zone.circle.options.set('strokeWidth', zone.__selected ? 3 : 2);
+        zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
+      }
+    } else if (!shouldRender && zone.rendered) {
+      if (zone.circle) state.map.geoObjects.remove(zone.circle);
+      if (zone.placemark) state.map.geoObjects.remove(zone.placemark);
+      zone.circle = null;
+      zone.placemark = null;
+      zone.rendered = false;
     }
-    function clearZoneIntersectionFlags(){
-      [...state.weightZones, ...state.platonZones].forEach((z) => { z.__intersects = true; });
-      redrawZonesInView();
+  };
+
+  state.weightZones.forEach(z => processZone(z, showWeight));
+  state.platonZones.forEach(z => processZone(z, showPlaton));
+}
+
+function applyZoneVisibility() {
+  redrawZonesInView();
+  syncDetourList();
+}
+
+function syncDetourList() {
+  const selected = [...state.weightZones, ...state.platonZones].filter(z => z && z.__selected);
+  const uniq = [];
+  const seen = new Set();
+  selected.forEach(z => { if (!seen.has(z)) { seen.add(z); uniq.push(z); } });
+  state.detourList = uniq;
+}
+
+function markRouteIntersections(hits) {
+  const zones = [...state.weightZones, ...state.platonZones];
+  zones.forEach(z => { z.__intersects = false; });
+  (hits || []).forEach(hit => { if (hit?.zone) hit.zone.__intersects = true; });
+  redrawZonesInView();
+}
+
+function clearZoneIntersectionFlags() {
+  [...state.weightZones, ...state.platonZones].forEach(z => { z.__intersects = true; });
+  redrawZonesInView();
+}
+
+function resetZoneSelections() {
+  [...state.weightZones, ...state.platonZones].forEach(z => { z.__selected = false; });
+  syncDetourList();
+  state.detourList = [];
+}
+
+// Пересечения маршрута с кругами зон
+function detectIntersections(path) {
+  if (!Array.isArray(path) || path.length < 2) return [];
+  const all = [...state.weightZones, ...state.platonZones];
+  const out = [];
+  all.forEach(zone => {
+    if (!zone) return;
+    for (let i = 0; i < path.length - 1; i += 1) {
+      const p1 = path[i], p2 = path[i + 1];
+      const d = pointToSegmentMeters(zone.center, p1, p2);
+      if (d <= (zone.radius || 0)) {
+        out.push({ zone, point: zone.center, segmentIndex: i, distance: d });
+        break;
+      }
     }
-    function resetZoneSelections(){
-      [...state.weightZones, ...state.platonZones].forEach((z) => { z.__selected = false; });
-      syncDetourList();
-      state.detourList = [];
-    }
+  });
+  return out;
+}
+
+// Приближённое расстояние от точки до отрезка в метрах (проекция на «плоскость» по средней широте)
+function pointToSegmentMeters(p, a, b) {
+  const R = 6371000;
+  const lat0 = ((a[0] + b[0]) / 2) * Math.PI / 180;
+  const toXY = ([lat, lon]) => {
+    const x = R * (lon * Math.PI / 180) * Math.cos(lat0);
+    const y = R * (lat * Math.PI / 180);
+    return { x, y };
+  };
+  const A = toXY(a), B = toXY(b), P = toXY(p);
+  const vx = B.x - A.x, vy = B.y - A.y;
+  const wx = P.x - A.x, wy = P.y - A.y;
+  const c1 = vx * wx + vy * wy;
+  const c2 = vx * vx + vy * vy;
+  const t = c2 === 0 ? 0 : Math.max(0, Math.min(1, c1 / c2));
+  const proj = { x: A.x + t * vx, y: A.y + t * vy };
+  return Math.hypot(P.x - proj.x, P.y - proj.y);
+}
+
 
     // -------- Routing
     async function buildRoute(options = {}) {
