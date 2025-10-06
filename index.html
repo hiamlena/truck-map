@@ -110,26 +110,39 @@
         <label><input type="checkbox" id="platonToggle" /> Платон</label>
         <label><input type="checkbox" id="tollToggle" /> Избегать платных дорог</label>
       </div>
-      <div class="actions">
-        <button type="submit" id="buildRouteBtn">Построить маршрут</button>
-        <button type="button" class="secondary" id="detourBtn">ИИ-объезд</button>
-        <button type="button" class="danger" id="clearBtn">Очистить</button>
-        <button type="button" class="secondary" id="shareBtn">Поделиться</button>
-      </div>
+     <div class="actions">
+  <button type="submit" id="buildRouteBtn">Построить маршрут</button>
+  <button type="button" class="secondary" id="detourBtn">ИИ-объезд</button>
+
+  <!-- CHANGE: ручной объезд (добавление via-точек кликом по карте) -->
+  <button type="button" class="secondary" id="manualDetourBtn">Ручной объезд</button>
+  <button type="button" class="secondary" id="manualDoneBtn" style="display:none">Построить с via</button>
+  <button type="button" class="danger" id="manualClearBtn" style="display:none">Сбросить via</button>
+
+  <button type="button" class="danger" id="clearBtn">Очистить</button>
+  <button type="button" class="secondary" id="shareBtn">Поделиться</button>
+</div>
     </form>
   </div>
 
   <script>
   (() => {
-    const state = {
-      map: null, routeLine: null, detourLine: null, routeMarkers: [],
-      routeData: null, routeHistory: [],
-      weightZones: [], platonZones: [],
-      detourList: [], recommendations: [],
-      activeRouteKind: 'main',
-      // CHANGE: режим карты по умолчанию — "Стандарт" (вернул «на базу»)
-      mapMode: 'yandex#map'
-    };
+   const state = {
+  map: null, routeLine: null, detourLine: null, routeMarkers: [],
+  routeData: null, routeHistory: [],
+  weightZones: [], platonZones: [],
+  detourList: [], recommendations: [],
+  activeRouteKind: 'main',
+  // CHANGE: режим карты по умолчанию — "Стандарт" (вернул «на базу»)
+  mapMode: 'yandex#map',
+
+  // CHANGE: ручной объезд (ручные via-точки)
+  manualDetour: false,
+  manualVia: [],
+  manualViaMarkers: [],
+  manualPreview: null,
+};
+
 
     const elements = {
       fromInput: byId('fromInput'), toInput: byId('toInput'),
@@ -212,51 +225,85 @@
       applyZoneVisibility();
     }
 
-    function bindEvents(){
-      elements.form.addEventListener('submit', e=>{ e.preventDefault(); buildRoute(); });
-      elements.detourBtn.addEventListener('click', handleDetour);
-      elements.clearBtn.addEventListener('click', clearRoute);
-      elements.shareBtn.addEventListener('click', shareRoute);
+   function bindEvents(){
+  elements.form.addEventListener('submit', e=>{ e.preventDefault(); buildRoute(); });
+  elements.detourBtn.addEventListener('click', handleDetour);
+  elements.clearBtn.addEventListener('click', clearRoute);
+  elements.shareBtn.addEventListener('click', shareRoute);
 
-      elements.mapModeSelect?.addEventListener('change', ()=>{
-        if(!state.map) return; applyMapMode(elements.mapModeSelect.value); saveSettings();
-      });
+  elements.mapModeSelect?.addEventListener('change', ()=>{
+    if(!state.map) return;
+    applyMapMode(elements.mapModeSelect.value);
+    saveSettings();
+  });
 
-      elements.weightToggle.addEventListener('change', ()=>{
-        saveSettings(); applyZoneVisibility();
-        if(state.routeData){
-          state.routeData.intersections = detectIntersections(state.routeData.path);
-          markRouteIntersections(state.routeData.intersections||[]);
-          updateRecommendations();
-        }
-      });
-      elements.platonToggle.addEventListener('change', ()=>{
-        saveSettings(); applyZoneVisibility();
-        if(state.routeData){
-          state.routeData.intersections = detectIntersections(state.routeData.path);
-          markRouteIntersections(state.routeData.intersections||[]);
-          updateRecommendations();
-        }
-      });
-      elements.tollToggle.addEventListener('change', ()=>{
-        saveSettings();
-        if(elements.tollToggle.checked && !tollWarned){
-          alert('На публичном OSRM «избегать платных дорог» может игнорироваться. В ссылках Google/Яндекс режим учитывается.');
-          tollWarned=true;
-        }
-        if(state.routeData) updateRecommendations();
-      });
-
-      elements.fromInput.addEventListener('input', debounce(saveSettings,400));
-      elements.toInput.addEventListener('input', debounce(saveSettings,400));
-
-      elements.legendToggleBtn.addEventListener('click', ()=>togglePanel(elements.legend, elements.legendToggleBtn, 'легенду'));
-      elements.recommendationsToggleBtn.addEventListener('click', ()=>togglePanel(elements.recommendations, elements.recommendationsToggleBtn, 'рекомендации'));
-      elements.sheetToggleBtn.addEventListener('click', ()=>togglePanel(elements.sheet, elements.sheetToggleBtn, 'панель'));
-
-      if(state.map) state.map.events.add('boundschange', debounce(redrawZonesInView, 250));
-      setupResponsivePanels();
+  elements.weightToggle.addEventListener('change', ()=>{
+    saveSettings(); applyZoneVisibility();
+    if(state.routeData){
+      state.routeData.intersections = detectIntersections(state.routeData.path);
+      markRouteIntersections(state.routeData.intersections||[]);
+      updateRecommendations();
     }
+  });
+
+  elements.platonToggle.addEventListener('change', ()=>{
+    saveSettings(); applyZoneVisibility();
+    if(state.routeData){
+      state.routeData.intersections = detectIntersections(state.routeData.path);
+      markRouteIntersections(state.routeData.intersections||[]);
+      updateRecommendations();
+    }
+  });
+
+  elements.tollToggle.addEventListener('change', ()=>{
+    saveSettings();
+    if(elements.tollToggle.checked && !tollWarned){
+      alert('На публичном OSRM «избегать платных дорог» может игнорироваться. В ссылках Google/Яндекс режим учитывается.');
+      tollWarned = true;
+    }
+    if(state.routeData) updateRecommendations();
+  });
+
+  elements.fromInput.addEventListener('input', debounce(saveSettings,400));
+  elements.toInput.addEventListener('input', debounce(saveSettings,400));
+
+  elements.legendToggleBtn.addEventListener('click', ()=>togglePanel(elements.legend, elements.legendToggleBtn, 'легенду'));
+  elements.recommendationsToggleBtn.addEventListener('click', ()=>togglePanel(elements.recommendations, elements.recommendationsToggleBtn, 'рекомендации'));
+  elements.sheetToggleBtn.addEventListener('click', ()=>togglePanel(elements.sheet, elements.sheetToggleBtn, 'панель'));
+
+  if(state.map) state.map.events.add('boundschange', debounce(redrawZonesInView, 250));
+  setupResponsivePanels();
+
+  // ============ Ручной объезд ============
+  elements.manualDetourBtn.addEventListener('click', () => {
+    if (!state.routeData) {
+      alert('Сначала постройте основной маршрут.');
+      return;
+    }
+    startManualDetour();
+  });
+
+  elements.manualDoneBtn.addEventListener('click', async () => {
+    if (!state.manualVia.length) {
+      alert('Добавьте хотя бы одну via-точку кликом по карте.');
+      return;
+    }
+    await applyManualDetour();
+  });
+
+  elements.manualClearBtn.addEventListener('click', () => {
+    clearManualDetour();
+  });
+
+  // Клики по карте для добавления via-точек
+  if (state.map) {
+    state.map.events.add('click', (e) => {
+      if (!state.manualDetour) return;
+      const coords = e.get('coords');
+      addManualVia(coords);
+    });
+  }
+}
 
     // -------- Зоны
     async function loadZonesLazy(){
@@ -853,30 +900,68 @@
     }
 
     // utils
-    function byId(id){ return document.getElementById(id); }
-    function formatDistance(v){ if(!Number.isFinite(v)) return '—'; const s=v<0?-1:1, a=Math.abs(v); const f=a>=1000?`${(a/1000).toFixed(1)} км`:`${Math.round(a)} м`; return s<0?`-${f}`:f; }
-    function formatDuration(v){ if(!Number.isFinite(v)) return '—'; const s=v<0?-1:1, a=Math.abs(v), m=Math.round(a/60), h=Math.floor(m/60), mm=m%60, f=h>0?`${h} ч ${mm} мин`:`${mm} мин`; return s<0?`-${ф}`:f; }
-    function formatStep(step){ if(!step) return 'Двигайтесь прямо'; const m=step.maneuver && (step.maneuver.instruction||step.maneuver.type); const base=m||'Двигайтесь'; const name=step.name?` на ${step.name}`:''; return base+name; }
-    function delay(ms){ return new Promise(res=>setTimeout(res,ms)); }
-    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-    function debounce(fn,wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
-    function toRad(d){ return d*Math.PI/180; } function toDeg(r){ return r*180/Math.PI; }
-    function normalizeLon(l){ while(l>180) l-=360; while(l<-180) l+=360; return l; }
-    function haversine(a,b){ const R=6371000, dLat=toRad(b[0]-a[0]), dLon=toRad(b[1]-a[1]), lat1=toRad(a[0]), lat2=toRad(b[0]); const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
-    function bearingBetween(a,b){ const lat1=toRad(a[0]), lat2=toRad(b[0]), dLon=toRad(b[1]-a[1]); const y=Math.sin(dLon)*Math.cos(lat2); const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon); return Math.atan2(y,x); }
-    function destinationPoint(start,bearing,distance){ const R=6371000, ad=distance/R, lat1=toRad(start[0]), lon1=toRad(start[1]); const lat2=Math.asin(Math.sin(lat1)*Math.cos(ad)+Math.cos(lat1)*Math.sin(ad)*Math.cos(bearing)); const lon2=lon1+Math.atan2(Math.sin(bearing)*Math.sin(ad)*Math.cos(lat1), Math.cos(ad)-Math.sin(lat1)*Math.sin(lat2)); return [toDeg(lat2), normalizeLon(toDeg(lon2))]; }
-    if(typeof pickEvenlySpacedPoints!=='function'){
-      window.pickEvenlySpacedPoints=function(path,n){
-        if(!Array.isArray(path)||path.length<2) return path||[];
-        const count=Math.max(2,Math.min(n||2,path.length));
-        if(count===2) return [path[0], path[path.length-1]];
-        const out=[]; for(let i=0;i<count;i++){
-          const idx=Math.round((i*(path.length-1))/(count-1));
-          out.push(path[idx]);
-        }
-        return out;
-      }
+function byId(id){ return document.getElementById(id); }
+function formatDistance(v){
+  if(!Number.isFinite(v)) return '—';
+  const s = v < 0 ? -1 : 1, a = Math.abs(v);
+  const f = a >= 1000 ? `${(a/1000).toFixed(1)} км` : `${Math.round(a)} м`;
+  return s < 0 ? `-${f}` : f;
+}
+function formatDuration(v){
+  if(!Number.isFinite(v)) return '—';
+  const s = v < 0 ? -1 : 1, a = Math.abs(v);
+  const m = Math.round(a/60), h = Math.floor(m/60), mm = m % 60;
+  const f = h > 0 ? `${h} ч ${mm} мин` : `${mm} мин`;
+  return s < 0 ? `-${f}` : f;   // <-- тут именно f, не "ф"
+}
+function formatStep(step){
+  if(!step) return 'Двигайтесь прямо';
+  const m = step.maneuver && (step.maneuver.instruction || step.maneuver.type);
+  const base = m || 'Двигайтесь';
+  const name = step.name ? ` на ${step.name}` : '';
+  return base + name;
+}
+function delay(ms){ return new Promise(res => setTimeout(res, ms)); }
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function debounce(fn,wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
+function toRad(d){ return d*Math.PI/180; }
+function toDeg(r){ return r*180/Math.PI; }
+function normalizeLon(l){ while(l>180) l-=360; while(l<-180) l+=360; return l; }
+function haversine(a,b){
+  const R=6371000, dLat=toRad(b[0]-a[0]), dLon=toRad(b[1]-a[1]),
+        lat1=toRad(a[0]), lat2=toRad(b[0]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function bearingBetween(a,b){
+  const lat1=toRad(a[0]), lat2=toRad(b[0]), dLon=toRad(b[1]-a[1]);
+  const y=Math.sin(dLon)*Math.cos(lat2);
+  const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+  return Math.atan2(y,x);
+}
+function destinationPoint(start,bearing,distance){
+  const R=6371000, ad=distance/R, lat1=toRad(start[0]), lon1=toRad(start[1]);
+  const lat2=Math.asin(Math.sin(lat1)*Math.cos(ad)+Math.cos(lat1)*Math.sin(ad)*Math.cos(bearing));
+  const lon2=lon1+Math.atan2(Math.sin(bearing)*Math.sin(ad)*Math.cos(lat1), Math.cos(ad)-Math.sin(lat1)*Math.sin(lat2));
+  return [toDeg(lat2), normalizeLon(toDeg(lon2))];
+}
+if(typeof pickEvenlySpacedPoints!=='function'){
+  window.pickEvenlySpacedPoints=function(path,n){
+    if(!Array.isArray(path)||path.length<2) return path||[];
+    const count=Math.max(2,Math.min(n||2,path.length));
+    if(count===2) return [path[0], path[path.length-1]];
+    const out=[]; for(let i=0;i<count;i++){
+      const idx=Math.round((i*(path.length-1))/(count-1));
+      out.push(path[idx]);
     }
+    return out;
+  }
+}
   })();
   </script>
 </body>
