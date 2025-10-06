@@ -138,7 +138,7 @@
       loading: byId('loading'), mapModeSelect: byId('mapModeSelect'),
     };
 
-    // CHANGE: инициализируем флаги, из-за которых всё падало
+    // CHANGE: инициализация служебных флагов
     let tollWarned = false;
     let loadingCounter = 0;
 
@@ -155,7 +155,7 @@
 
     // Suggest (мягкий)
     function wireSuggestSafe(inputEl){
-      inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('buildRouteBtn')?.click(); }});
+      inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventdefault?.(); e.preventDefault(); byId('buildRouteBtn')?.click(); }});
       let t=null; inputEl.addEventListener('input', ()=>{ clearTimeout(t); const q=inputEl.value.trim(); if(q.length<3) return; t=setTimeout(async()=>{ try{ if(typeof ymaps?.suggest==='function') await ymaps.suggest(q); }catch(_){} },250); });
     }
 
@@ -255,7 +255,7 @@
             const [lon, lat] = f.geometry.coordinates;
             const props = f.properties || {};
             return {
-              __id: ++__zoneCounter,                 // один уникальный ID
+              __id: ++__zoneCounter,
               type: opt.type,
               center: [lat, lon],
               radius: Number(props.radius_m) || opt.defaultRadius,
@@ -278,7 +278,7 @@
         zoneCache.set(url, zones);
         opt.target.splice(0, opt.target.length, ...cloneZones(zones));
       } catch (e) {
-        console.warn('Ошибка загрузки GeoJSON', url, e);
+        console.warn('Ошибка загрузки GeoJSON', url, e); // не останавливаем выполнение
       }
     }
     function cloneZones(zs){
@@ -332,13 +332,17 @@
           zone.circle.events.add('click', ()=>{ try{ zone.circle.balloon.open(); }catch(_){ zone.placemark?.balloon?.open(); } });
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
 
-          // привязка кнопки в момент открытия балуна
+          // CHANGE: привязка обработчика кнопки при открытии балуна
           const attach = (geo, z) => geo.events.add('balloonopen', () => {
             const btn = document.getElementById(`detourBtn_${z.__id}`);
             if (btn) {
               btn.onclick = () => {
-                toggleZoneDetour(z);   // переключаем зону
-                handleDetour();        // и сразу перестраиваем альтернативный маршрут
+                try {
+                  toggleZoneDetour(z);   // CHANGE: переключаем состояние зоны
+                  handleDetour();        // CHANGE: сразу перестраиваем маршрут
+                } catch (err) {
+                  console.warn('Detour click handler error:', err); // CHANGE: не падаем
+                }
               };
             }
           });
@@ -351,10 +355,10 @@
             zone.circle.options.set('strokeWidth', zone.__selected?3:2);
             zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
             zone.circle.options.set('fillOpacity', zone.__selected ? 0.45 : 0.35);
-            zone.circle.properties.set('balloonContent', buildBalloon(zone));
+            zone.circle.properties.set('balloonContent', buildBalloon(zone)); // текст кнопки актуален
           }
           if(zone.placemark){
-            zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+            zone.placemark.properties.set('balloonContent', buildBalloon(zone)); // текст кнопки актуален
           }
         }else if(!shouldRender && zone.rendered){
           if(zone.circle) state.map.geoObjects.remove(zone.circle);
@@ -377,8 +381,8 @@
       }
       syncDetourList();
       updateRecommendations();
-      if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
-      if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+      if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone)); // CHANGE: обновляем текст кнопки
+      if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone)); // CHANGE: обновляем текст кнопки
     }
 
     function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
@@ -531,6 +535,10 @@
       showLoading();
       try{
         if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
+
+        // CHANGE: лог для отладки выбранных зон
+        console.log('Detour triggered with zones:', state.detourList);
+
         const base = state.routeData;
         const ints = Array.isArray(base.intersections)? base.intersections : [];
         const selectedZones = (state.detourList||[]).filter(Boolean);
@@ -681,7 +689,7 @@
         return;
       }
       if(oniOS){
-        const appStore='https://apps.apple.com/ru/app/yandex-navigator/id474500851';
+        const appStore='https://apps.apple.com/ru/app/yandex-нavigator/id474500851';
         window.location.href=schemeUrl;
         setTimeout(()=>{ window.location.href=appStore; },1200);
         return;
@@ -701,7 +709,7 @@
       const g=new URL('https://www.google.com/maps/dir/'); g.searchParams.set('api','1'); g.searchParams.set('origin',fmt(from)); g.searchParams.set('destination',fmt(to)); g.searchParams.set('travelmode','driving');
       if(elements.tollToggle?.checked) g.searchParams.set('avoid','tolls');
       const y=`https://yandex.ru/maps/?rtext=${fmt(from)}~${fmt(to)}&rtt=auto`;
-      const nav=`yandexnavi://build_route_on_map?lat_from=${from[0].toFixed(6)}&lon_from=${from[1].toFixed(6)}&lat_to=${to[0].toFixed(6)}&lon_to=${to[1].toFixed(6)}`;
+      const nav=`yandexnavi://build_route_on_map?lat_from=${from[0].toFixed(6)}&lon_from=${from[1]).toFixed(6)}&lat_to=${to[0].toFixed(6)}&lon_to=${to[1].toFixed(6)}`;
       return [`Google Maps: ${g.toString()}`, `Яндекс.Карты: ${y}`, `Яндекс.Навигатор: ${nav}`];
     }
     function clearRoute(){
@@ -747,7 +755,7 @@
     // utils
     function byId(id){ return document.getElementById(id); }
     function formatDistance(v){ if(!Number.isFinite(v)) return '—'; const s=v<0?-1:1, a=Math.abs(v); const f=a>=1000?`${(a/1000).toFixed(1)} км`:`${Math.round(a)} м`; return s<0?`-${f}`:f; }
-    function formatDuration(v){ if(!Number.isFinite(v)) return '—'; const s=v<0?-1:1, a=Math.abs(v), m=Math.round(a/60), h=Math.floor(m/60), mm=m%60, f=h>0?`${h} ч ${mm} мин`:`${mm} мин`; return s<0?`-${f}`:f; }
+    function formatDuration(v){ if(!Number.isFinite(v)) return '—'; const s=v<0?-1:1, a=Math.abs(v), m=Math.round(a/60), h=Math.floor(m/60), mm=m%60, f=h>0?`${h} ч ${mm} мин`:`${mm} мин`; return s<0?`-${ф}`:f; }
     function formatStep(step){ if(!step) return 'Двигайтесь прямо'; const m=step.maneuver && (step.maneuver.instruction||step.maneuver.type); const base=m||'Двигайтесь'; const name=step.name?` на ${step.name}`:''; return base+name; }
     function delay(ms){ return new Promise(res=>setTimeout(res,ms)); }
     function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -756,8 +764,37 @@
     function normalizeLon(l){ while(l>180) l-=360; while(l<-180) l+=360; return l; }
     function haversine(a,b){ const R=6371000, dLat=toRad(b[0]-a[0]), dLon=toRad(b[1]-a[1]), lat1=toRad(a[0]), lat2=toRad(b[0]); const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
     function bearingBetween(a,b){ const lat1=toRad(a[0]), lat2=toRad(b[0]), dLon=toRad(b[1]-a[1]); const y=Math.sin(dLon)*Math.cos(lat2); const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon); return Math.atan2(y,x); }
-    function destinationPoint(start,bearing,distance){ const R=6371000, ad=distance/R, lat1=toRad(start[0]), lon1=toRad(start[1]); const lat2=Math.asin(Math.sin(lat1)*Math.cos(ad)+Math.cos(lat1)*Math.sin(ad)*Math.cos(bearing)); const lon2=lon1+Math.atan2(Math.sin(bearing)*Math.sin(ad)*Math.cos(lat1), Math.cos(ad)-Math.sin(lat1)*Math.sin(lat2)); return [toDeg(lat2), normalizeLon(toDeg(lon2))]; }
-    if(typeof pickEvenlySpacedPoints!=='function'){ window.pickEvenlySpacedPoints=function(path,n){ if(!Array.isArray(path)||path.length<2) return path||[]; const count=Math.max(2,Math.min(n||2,path.length)); if(count===2) return [path[0], path[path.length-1]]; const out=[]; for(let i=0;i<count;i++){ const idx=Math.round((i*(path.length-1))/(count-1)); out.push(path[idx]); } return out; } }
+    function destinationPoint(start,bearing,distance){ const R=6371000, ad=distance/R, lat1=toRad(start[0]), lon1=toRad(start[1]); const lat2=Math.asin(Math.sin(lat1)*Math.cos(ad)+Math.cos(lat1)*Math.sin(ad)*Math.cos(bearing)); const lon2=лон1+Math.atan2(Math.sin(bearing)*Math.sin(ad)*Math.cos(lat1), Math.cos(ad)-Math.sin(lat1)*Math.sin(lat2)); return [toDeg(lat2), normalizeLon(toDeg(lon2))]; }
+
+    // CHANGE: безопасный фоллбек для evenly-селектора via-точек (не меняет логику, лишь не даёт коду упасть)
+    if(typeof window.selectEvenly!=='function'){
+      window.selectEvenly = function(points, k){
+        if(!Array.isArray(points) || points.length===0) return [];
+        const n = Math.max(0, Math.min(k|0, points.length));
+        if(n<=0) return [];
+        if(n>=points.length) return points.slice();
+        const out=[];
+        for(let i=0;i<n;i++){
+          const idx = Math.round((i*(points.length-1))/(n-1));
+          if(!out.length || out[out.length-1]!==points[idx]) out.push(points[idx]);
+        }
+        return out;
+      };
+    }
+
+    if(typeof pickEvenlySpacedPoints!=='function'){
+      window.pickEvenlySpacedPoints=function(path,n){
+        if(!Array.isArray(path)||path.length<2) return path||[];
+        const count=Math.max(2,Math.min(n||2,path.length));
+        if(count===2) return [path[0], path[path.length-1]];
+        const out=[];
+        for(let i=0;i<count;i++){
+          const idx=Math.round((i*(path.length-1))/(count-1));
+          out.push(path[idx]);
+        }
+        return out;
+      };
+    }
   })();
   </script>
 </body>
