@@ -138,9 +138,12 @@
       loading: byId('loading'), mapModeSelect: byId('mapModeSelect'),
     };
 
-    let __zoneCounter = 0; // счётчик, чтобы каждая зона имела уникальный ID
+    // CHANGE: инициализируем флаги, из-за которых всё падало
+    let tollWarned = false;
+    let loadingCounter = 0;
+
+    let __zoneCounter = 0;         // уникальный ID для каждой зоны (кнопка в балуне)
     const zoneCache = new Map();
-    let zoneIdSeq = 1; // CHANGE: уникальные id для кнопок в балунах
 
     // Loading overlay
     elements.loading.hidden = true; elements.loading.style.display = 'none';
@@ -150,7 +153,7 @@
     // Map type
     function applyMapMode(mode){ const type = typeof mode==='string'? mode : 'yandex#hybrid'; state.mapMode = type; if(elements.mapModeSelect && elements.mapModeSelect.value!==type){ elements.mapModeSelect.value=type; } if(state.map?.setType) state.map.setType(type); }
 
-    // Suggest
+    // Suggest (мягкий)
     function wireSuggestSafe(inputEl){
       inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('buildRouteBtn')?.click(); }});
       let t=null; inputEl.addEventListener('input', ()=>{ clearTimeout(t); const q=inputEl.value.trim(); if(q.length<3) return; t=setTimeout(async()=>{ try{ if(typeof ymaps?.suggest==='function') await ymaps.suggest(q); }catch(_){} },250); });
@@ -226,65 +229,71 @@
     }
 
     // -------- Зоны
-    async function loadGeoJson(url, opt){
-  try{
-    // если уже грузили этот файл — берём из кэша
-    if (zoneCache.has(url)) {
-      opt.target.splice(0, opt.target.length, ...cloneZones(zoneCache.get(url)));
-      return;
+    async function loadZonesLazy(){
+      if(!state.map) return;
+      await Promise.all([
+        loadGeoJson('weigh_frames.geojson', { color:'#ff3b30', fillColor:'rgba(255,59,48,0.18)', defaultRadius:500, target:state.weightZones, type:'weight' }),
+        loadGeoJson('platon.geojson',       { color:'#ff9500', fillColor:'rgba(255,149,0,0.18)', defaultRadius:300, target:state.platonZones, type:'platon' }),
+      ]);
+      redrawZonesInView();
     }
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    async function loadGeoJson(url, opt){
+      try{
+        if (zoneCache.has(url)) {
+          opt.target.splice(0, opt.target.length, ...cloneZones(zoneCache.get(url)));
+          return;
+        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data.features)) return;
 
-    const data = await res.json();
-    if (!Array.isArray(data.features)) return;
+        const zones = data.features
+          .filter(f => f.geometry && f.geometry.type === 'Point')
+          .map(f => {
+            const [lon, lat] = f.geometry.coordinates;
+            const props = f.properties || {};
+            return {
+              __id: ++__zoneCounter,                 // один уникальный ID
+              type: opt.type,
+              center: [lat, lon],
+              radius: Number(props.radius_m) || opt.defaultRadius,
+              color: opt.color,
+              fillColor: opt.fillColor,
+              properties: {
+                name: props.name || 'Без названия',
+                road: props.road || '',
+                km: props.km || '',
+                note: props.note || '',
+              },
+              placemark: null,
+              circle: null,
+              rendered: false,
+              __selected: false,
+              __intersects: true,
+            };
+          });
 
-    const zones = data.features
-      .filter(f => f.geometry && f.geometry.type === 'Point')
-      .map(f => {
-        const [lon, lat] = f.geometry.coordinates;
-        const props = f.properties || {};
-        return {
-          __id: ++__zoneCounter,                 // ← оставляем только один уникальный ID
-          type: opt.type,
-          center: [lat, lon],
-          radius: Number(props.radius_m) || opt.defaultRadius,
-          color: opt.color,
-          fillColor: opt.fillColor,
-          properties: {
-            name: props.name || 'Без названия',
-            road: props.road || '',
-            km: props.km || '',
-            note: props.note || '',
-          },
-          placemark: null,
-          circle: null,
-          rendered: false,
-          __selected: false,
-          __intersects: true,
-        };
-      });
-
-    zoneCache.set(url, zones);
-    opt.target.splice(0, opt.target.length, ...cloneZones(zones));
-  } catch (e) {
-    console.warn('Ошибка загрузки GeoJSON', url, e);
-  }
-}
+        zoneCache.set(url, zones);
+        opt.target.splice(0, opt.target.length, ...cloneZones(zones));
+      } catch (e) {
+        console.warn('Ошибка загрузки GeoJSON', url, e);
+      }
+    }
     function cloneZones(zs){
-  return zs.map(z => ({
-    ...z,
-    properties: { ...z.properties },
-    placemark: null,
-    circle: null,
-    rendered: false,
-    __selected: Boolean(z.__selected),
-    __intersects: z.__intersects !== false,
-  }));
-}
+      return zs.map(z => ({
+        ...z,
+        properties: { ...z.properties },
+        placemark: null,
+        circle: null,
+        rendered: false,
+        __selected: Boolean(z.__selected),
+        __intersects: z.__intersects !== false,
+      }));
+    }
 
-    // CHANGE: HTML балуна с кнопкой
+    // Балун с кнопкой "Объезд"
     function buildBalloon(zone){
       const p = zone.properties || {};
       const lines = [];
@@ -319,36 +328,33 @@
           state.map.geoObjects.add(zone.circle);
           state.map.geoObjects.add(zone.placemark);
 
-          // CHANGE: клики открывают балун
+          // клик — открыть балун
           zone.circle.events.add('click', ()=>{ try{ zone.circle.balloon.open(); }catch(_){ zone.placemark?.balloon?.open(); } });
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
 
-          // CHANGE: привязываем обработчик кнопки при открытии балуна
-       const attach = (geo, z) => geo.events.add('balloonopen', () => {
-  const btn = document.getElementById(`detourBtn_${z.__id}`);
-  if (btn) {
-    btn.onclick = () => {
-      toggleZoneDetour(z);   // переключаем зону
-      handleDetour();        // и СРАЗУ перестраиваем альтернативный маршрут
-    };
-  }
-});
-
+          // привязка кнопки в момент открытия балуна
+          const attach = (geo, z) => geo.events.add('balloonopen', () => {
+            const btn = document.getElementById(`detourBtn_${z.__id}`);
+            if (btn) {
+              btn.onclick = () => {
+                toggleZoneDetour(z);   // переключаем зону
+                handleDetour();        // и сразу перестраиваем альтернативный маршрут
+              };
+            }
+          });
           attach(zone.placemark, zone);
           attach(zone.circle, zone);
 
           zone.rendered = true;
         }else if(shouldRender && zone.rendered){
-          // обновим стиль (толщина/прозрачность) и контент балуна (текст кнопки)
           if(zone.circle){
             zone.circle.options.set('strokeWidth', zone.__selected?3:2);
             zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
             zone.circle.options.set('fillOpacity', zone.__selected ? 0.45 : 0.35);
-
-            zone.circle.properties.set('balloonContent', buildBalloon(zone)); // CHANGE
+            zone.circle.properties.set('balloonContent', buildBalloon(zone));
           }
           if(zone.placemark){
-            zone.placemark.properties.set('balloonContent', buildBalloon(zone)); // CHANGE
+            zone.placemark.properties.set('balloonContent', buildBalloon(zone));
           }
         }else if(!shouldRender && zone.rendered){
           if(zone.circle) state.map.geoObjects.remove(zone.circle);
@@ -361,7 +367,6 @@
       state.platonZones.forEach(z=>process(z, showPlaton));
     }
 
-    // CHANGE: переключить выбранность зоны из балуна
     function toggleZoneDetour(zone){
       if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
       zone.__selected = !zone.__selected;
@@ -369,16 +374,11 @@
         zone.circle.options.set('strokeWidth', zone.__selected?3:2);
         zone.circle.options.set('strokeOpacity', zone.__selected ? 0.9 : 0.6);
         zone.circle.options.set('fillOpacity',  zone.__selected ? 0.45 : 0.35);
-
       }
       syncDetourList();
       updateRecommendations();
-     // Обновим кнопку в текущем открытом балуне
-if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
-if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
-
-// Сразу перестроим маршрут (подстраховка, если переключили не через кнопку)
-handleDetour();
+      if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
+      if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
     }
 
     function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
@@ -399,7 +399,7 @@ handleDetour();
     function clearZoneIntersectionFlags(){ [...state.weightZones,...state.platonZones].forEach(z=>z.__intersects=true); redrawZonesInView(); }
     function resetZoneSelections(){ [...state.weightZones,...state.platonZones].forEach(z=>z.__selected=false); syncDetourList(); state.detourList=[]; }
 
-    // -------- Геометрия
+    // Геометрия
     function pointToSegmentInfo(p,a,b){
       const R=6371000, lat0=((a[0]+b[0])/2)*Math.PI/180;
       const toXY=([lat,lon])=>({ x:R*(lon*Math.PI/180)*Math.cos(lat0), y:R*(lat*Math.PI/180) });
@@ -432,7 +432,7 @@ handleDetour();
       return best;
     }
 
-    // -------- Гео/парсинг
+    // Геокодинг/парсинг
     async function resolveInput(v){
       if(Array.isArray(v)&&v.length===2){ const a=Number(v[0]), b=Number(v[1]); if(Number.isFinite(a)&&Number.isFinite(b)) return [a,b]; }
       if(v && typeof v==='object' && !Array.isArray(v)){
@@ -460,7 +460,7 @@ handleDetour();
       return [lat,lon];
     }
 
-    // -------- Маршрутизация
+    // Маршрутизация
     async function buildRoute(options={}){
       showLoading();
       try{
@@ -526,7 +526,7 @@ handleDetour();
       return { path, steps, distance:route.distance, duration:route.duration };
     }
 
-    // -------- ИИ-объезд
+    // ИИ-объезд
     async function handleDetour(){
       showLoading();
       try{
@@ -537,7 +537,6 @@ handleDetour();
         const zones = selectedZones.length? selectedZones : ints.map(h=>h.zone).filter(Boolean);
         if(!zones.length){ alert('Зоны на маршруте не обнаружены.'); return; }
 
-        // via кандидаты по зонам
         const candidates=[];
         zones.forEach(zone=>{
           const hit = ints.find(x=>x.zone===zone);
@@ -548,7 +547,6 @@ handleDetour();
           const basePoint = anchor.closestPoint || anchor.point || zone.center;
           const offset = Math.max((zone.radius||400)*1.3, 300);
 
-          // CHANGE: учитывать note (слева/справа)
           const prefSide = parseNoteSide(zone.properties?.note||''); // -1=left, +1=right, 0=auto
           const detour = buildDetourPointPref(basePoint, segA, segB, zone.center, offset, zone.radius||0, prefSide);
           if(!detour) return;
@@ -567,15 +565,12 @@ handleDetour();
       finally{ hideLoading(); }
     }
 
-    // CHANGE: парсим «слева/справа» из note
     function parseNoteSide(note){
       const n = (note||'').toLowerCase();
       if(n.includes('слева')) return -1;
       if(n.includes('справа')) return +1;
       return 0;
     }
-
-    // CHANGE: детур с предпочтением стороны (left/right) + fallback наружу
     function buildDetourPointPref(basePoint, segA, segB, zoneCenter, distance, zoneRadius, sidePref){
       if(!Array.isArray(basePoint)||basePoint.length!==2) return null;
       let along = bearingBetween(segA||basePoint, segB||basePoint);
@@ -595,7 +590,6 @@ handleDetour();
         candidate = (haversine(l,zoneCenter) > haversine(r,zoneCenter)) ? l : r;
       }
 
-      // если всё ещё близко к центру — уводим наружу по направлению от центра
       if(zoneCenter && haversine(candidate, zoneCenter) < Math.max(zoneRadius*1.05, distance*0.75)){
         const escape = bearingBetween(zoneCenter, basePoint);
         if(Number.isFinite(escape)){
@@ -604,7 +598,6 @@ handleDetour();
       }
       return candidate;
     }
-
     function filterDetourCandidates(cands){
       if(!Array.isArray(cands)) return [];
       const sorted=[...cands].sort((a,b)=>(a.segmentIndex||0)-(b.segmentIndex||0));
@@ -631,7 +624,7 @@ handleDetour();
       const bounds=state.routeLine.geometry.getBounds(); if(bounds) state.map.setBounds(bounds, {checkZoomRange:true, zoomMargin:[40,240,240,40]});
     }
 
-    // -------- Шаринг / Навигатор
+    // Шаринг / Навигатор
     function formatPointIfNeeded(p){ if(Array.isArray(p)&&p.length===2) return `${Number(p[0]).toFixed(6)},${Number(p[1]).toFixed(6)}`; return String(p||''); }
     function shareRoute(){
       if(!state.routeData?.path || state.routeData.path.length<2){ alert('Постройте маршрут, чтобы поделиться.'); return; }
@@ -653,7 +646,7 @@ handleDetour();
       const maxPts=8;
       const pts = typeof pickEvenlySpacedPoints==='function'
         ? pickEvenlySpacedPoints(route.path, Math.min(maxPts, Math.max(2, Math.ceil(route.path.length/50))))
-        : (route.path.length>2 ? [route.path[0], route.path[Math.floor(route.path.length/2)], route.path[route.path.length-1]] : [route.path[0], route.path[route.path.length-1]]);
+        : (route.path.length>2 ? [route.path[0], route.path[Math.floor(route.path.length/2)], route.path[route.length-1]] : [route.path[0], route.path[route.path.length-1]]);
       const origin = pts[0], destination = pts[pts.length-1], via = pts.slice(1,-1);
       const fmt=(p)=>formatPointIfNeeded(p);
 
@@ -696,7 +689,7 @@ handleDetour();
       window.open(webFallback,'_blank');
     }
 
-    // -------- Прочее
+    // Прочее
     function offerRouteFallback(from,to,error){
       let msg='Не удалось получить маршрут от сервера OSRM.'; if(error?.message) msg+=`\nПричина: ${error.message}`;
       const links=buildDirectLinks(from,to); if(links.length) msg+=`\n\nПопробуйте открыть маршрут вручную:\n${links.join('\n')}`;
