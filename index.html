@@ -138,9 +138,9 @@
       loading: byId('loading'), mapModeSelect: byId('mapModeSelect'),
     };
 
-    // CHANGE: инициализируем флаги, из-за которых всё падало
-    let tollWarned = false;
-    let loadingCounter = 0;
+    // CHANGE: флаги и счётчик загрузки
+    let tollWarned = typeof tollWarned === 'boolean' ? tollWarned : false;
+    let loadingCounter = typeof loadingCounter === 'number' ? loadingCounter : 0;
 
     let __zoneCounter = 0;         // уникальный ID для каждой зоны (кнопка в балуне)
     const zoneCache = new Map();
@@ -332,15 +332,30 @@
           zone.circle.events.add('click', ()=>{ try{ zone.circle.balloon.open(); }catch(_){ zone.placemark?.balloon?.open(); } });
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
 
-          // привязка кнопки в момент открытия балуна
+          // CHANGE: reliable balloon button binding with retry
           const attach = (geo, z) => geo.events.add('balloonopen', () => {
-            const btn = document.getElementById(`detourBtn_${z.__id}`);
-            if (btn) {
-              btn.onclick = () => {
-                toggleZoneDetour(z);   // переключаем зону
-                handleDetour();        // и сразу перестраиваем альтернативный маршрут
-              };
-            }
+            let attempts = 0;
+            const tryBind = () => {
+              try {
+                const btn = document.getElementById(`detourBtn_${z.__id}`);
+                if (btn) {
+                  btn.onclick = () => {
+                    try {
+                      toggleZoneDetour(z);   // переключаем флаг и стиль
+                      handleDetour();        // и сразу перестраиваем маршрут
+                    } catch (err) {
+                      console.warn('Detour click handler error:', err);
+                    }
+                  };
+                } else if (attempts < 4) {
+                  attempts += 1;
+                  setTimeout(tryBind, 60);
+                }
+              } catch (e) {
+                console.warn('attach(balloonopen) error:', e);
+              }
+            };
+            tryBind();
           });
           attach(zone.placemark, zone);
           attach(zone.circle, zone);
@@ -377,8 +392,13 @@
       }
       syncDetourList();
       updateRecommendations();
-      if (zone.circle?.balloon?.isOpen()) zone.circle.properties.set('balloonContent', buildBalloon(zone));
-      if (zone.placemark?.balloon?.isOpen()) zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+      // CHANGE: обновить текст кнопки в открытом балуне
+      if (zone.circle?.balloon?.isOpen()) {
+        zone.circle.properties.set('balloonContent', buildBalloon(zone));
+      }
+      if (zone.placemark?.balloon?.isOpen()) {
+        zone.placemark.properties.set('balloonContent', buildBalloon(zone));
+      }
     }
 
     function applyZoneVisibility(){ redrawZonesInView(); syncDetourList(); }
@@ -530,6 +550,8 @@
     async function handleDetour(){
       showLoading();
       try{
+        // CHANGE: лог для отладки выбранных зон
+        console.log('Detour triggered with zones:', state.detourList);
         if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
         const base = state.routeData;
         const ints = Array.isArray(base.intersections)? base.intersections : [];
@@ -555,7 +577,28 @@
         });
 
         const filtered = filterDetourCandidates(candidates);
-        const via = selectEvenly(filtered.map(c=>c.point), Math.min(6, filtered.length));
+        // CHANGE: безопасный фоллбек для selectEvenly
+        const safeSelectEvenly = (typeof selectEvenly === 'function')
+          ? selectEvenly
+          : (pts, k) => {
+              try {
+                if (!Array.isArray(pts) || !pts.length) return [];
+                const n = Math.max(0, Math.min((k|0), pts.length));
+                if (n <= 0) return [];
+                if (n >= pts.length) return pts.slice();
+                const out = [];
+                for (let i = 0; i < n; i++) {
+                  const idx = Math.round((i * (pts.length - 1)) / (n - 1));
+                  if (!out.length || out[out.length - 1] !== pts[idx]) out.push(pts[idx]);
+                }
+                return out;
+              } catch (e) {
+                console.warn('selectEvenly fallback error:', e);
+                return pts || [];
+              }
+            };
+
+        const via = safeSelectEvenly(filtered.map(c=>c.point), Math.min(6, filtered.length));
         if(!via.length){ alert('Не удалось вычислить точки объезда.'); return; }
 
         const start = base.coordsList[0];
@@ -646,7 +689,9 @@
       const maxPts=8;
       const pts = typeof pickEvenlySpacedPoints==='function'
         ? pickEvenlySpacedPoints(route.path, Math.min(maxPts, Math.max(2, Math.ceil(route.path.length/50))))
-        : (route.path.length>2 ? [route.path[0], route.path[Math.floor(route.path.length/2)], route.path[route.length-1]] : [route.path[0], route.path[route.path.length-1]]);
+        : (route.path.length>2
+          ? [route.path[0], route.path[Math.floor(route.path.length/2)], route.path[route.path.length-1]] // CHANGE: fixed typo in share payload fallback
+          : [route.path[0], route.path[route.path.length-1]]);
       const origin = pts[0], destination = pts[pts.length-1], via = pts.slice(1,-1);
       const fmt=(p)=>formatPointIfNeeded(p);
 
