@@ -1026,6 +1026,57 @@ function parseLatLon(str) {
       if (rawText) return rawText;
       return name ? `Двигайтесь по ${name}` : '';
     }
+// Голосовые подсказки + подсветка активного шага
+function setActiveStep(index) {
+  state.currentStepIndex = index;
+  const items = elements.stepsList.querySelectorAll('li');
+  items.forEach((el) => el.classList.remove('active'));
+
+  // пробуем найти по исходному индексу ОСRM или по индексу в списке
+  const byOriginal = elements.stepsList.querySelector(`li[data-original-index="${index}"]`);
+  const byList = elements.stepsList.querySelector(`li[data-list-index="${index}"]`);
+  const target = byOriginal || byList || items[index] || null;
+  if (target) target.classList.add('active');
+}
+
+function speakSteps(steps) {
+  if (!Array.isArray(steps) || !steps.length) return;
+  if (!('speechSynthesis' in window)) return;
+
+  window.speechSynthesis.cancel();
+
+  // подготовим текст (используем локализованные инструкции, если есть)
+  state.voiceQueue = steps.map((s) => {
+    const txt = getLocalizedInstruction(s) || s.text || '';
+    return { ...s, localizedText: txt };
+  });
+
+  state.speaking = false;
+  state.currentStepIndex = 0;
+  speakNext();
+}
+
+function speakNext() {
+  if (!state.voiceQueue.length) { state.speaking = false; return; }
+
+  const step = state.voiceQueue.shift();
+  const utter = new SpeechSynthesisUtterance(step.localizedText || step.text || '');
+  utter.lang = 'ru-RU';
+  utter.rate = 1;
+
+  // Подсветим соответствующий шаг в списке (если нашли его в оригинальном массиве)
+  const idx = (state.routeData?.steps || []).indexOf(step);
+  if (idx >= 0) setActiveStep(idx);
+
+  utter.onend = () => {
+    // Пауза между репликами ~ длительность шага (саницезировано)
+    const ms = Math.min(Math.max((Number(step.duration) || 0) * 1000, 2000), 8000);
+    setTimeout(speakNext, ms);
+  };
+
+  state.speaking = true;
+  window.speechSynthesis.speak(utter);
+}
 
     // -------- Share (Google / Яндекс / Навигатор / WhatsApp)
     function formatPointIfNeeded(p) {
