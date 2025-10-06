@@ -674,7 +674,59 @@ function pointToSegmentMeters(p, a, b) {
   const proj = { x: A.x + t * vx, y: A.y + t * vy };
   return Math.hypot(P.x - proj.x, P.y - proj.y);
 }
+// ---------- Address/coords resolving ----------
+async function resolveInput(value) {
+  // 1) Уже координаты массивом?
+  if (Array.isArray(value) && value.length === 2) {
+    const lat = Number(value[0]);
+    const lon = Number(value[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) return [lat, lon];
+  }
+  // 2) Объект вида {lat,lon} / {latitude,longitude}
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
+      return [Number(value.lat), Number(value.lon)];
+    }
+    if (Number.isFinite(value.latitude) && Number.isFinite(value.longitude)) {
+      return [Number(value.latitude), Number(value.longitude)];
+    }
+  }
+  // 3) Строка: "lat,lon" или адрес
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
 
+    // 3.1 Координаты "lat,lon" или "lat;lon"
+    const parsed = parseLatLon(trimmed);
+    if (parsed) return parsed;
+
+    // 3.2 Геокод адреса через Яндекс
+    try {
+      if (typeof ymaps?.geocode === 'function') {
+        const result = await ymaps.geocode(trimmed, { results: 1 });
+        if (result.geoObjects.getLength()) {
+          const coords = result.geoObjects.get(0).geometry.getCoordinates(); // [lat, lon]
+          if (Array.isArray(coords) && coords.length === 2) return coords;
+        }
+      }
+    } catch (e) {
+      console.warn('Ошибка геокодирования:', e);
+    }
+  }
+  return null;
+}
+
+function parseLatLon(str) {
+  // Разделители: запятая или ';' (пробелы игнорируем)
+  const clean = String(str).trim().replace(/\s+/g, '');
+  const parts = clean.split(/[;,]/);
+  if (parts.length !== 2) return null;
+  const lat = Number(parts[0]);
+  const lon = Number(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return [lat, lon];
+}
 
     // -------- Routing
     async function buildRoute(options = {}) {
@@ -1194,7 +1246,6 @@ function pointToSegmentMeters(p, a, b) {
     }
 
     // -------- Utils
-    function detectIntersections(path){ return []; /* заглушка: добавь свою геометрию при необходимости */ }
     function getOffsetPoint(point, center, offset){ if(!point||!center) return null; const bearing = bearingBetween(point, center); return destinationPoint(point, reverseBearing(bearing), offset); }
     function selectEvenly(arr, n){ if(!Array.isArray(arr) || !arr.length) return []; const count = Math.max(1, Math.min(n || 1, arr.length)); if (count === 1) return [arr[0]]; const out = []; for (let i = 0; i < count; i += 1){ const idx = Math.round((i*(arr.length-1))/(count-1)); out.push(arr[idx]); } return out; }
     function formatDistance(value){ if (!Number.isFinite(value)) return '—'; const sign = value < 0 ? -1 : 1; const abs = Math.abs(value); const formatted = abs >= 1000 ? `${(abs/1000).toFixed(1)} км` : `${Math.round(abs)} м`; return sign < 0 ? `-${formatted}` : formatted; }
