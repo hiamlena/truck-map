@@ -1227,13 +1227,111 @@ function speakNext() {
       return String(p || '');
     }
 
-    function shareRoute() {
-      if (!state.routeData || !state.routeData.path || state.routeData.path.length < 2) {
-        alert('Постройте маршрут, чтобы поделиться.');
-        return;
-      }
-      const payload = buildSharePayload(state.routeData);
-      if (!payload) { alert('Недостаточно данных маршрута для шаринга.'); return; }
+   diff --git a/index.html b/index.html
+@@
+     function shareRoute() {
+@@
+-      switch (answer.trim()) {
++      switch (answer.trim()) {
+         case '1': window.open(payload.whatsApp, '_blank'); break;
+         case '2':
+@@
+-        case '3':
+-          if (payload.navigatorViaUrl) window.location.href = payload.navigatorViaUrl;
+-          else window.location.href = payload.navigatorFallbackUrl;
+-          break;
+-        case '4':
+-          window.location.href = payload.navigatorFallbackUrl;
+-          break;
++        case '3': openYandexNavigator({ origin: payload.origin, destination: payload.destination, via: payload.via }); break;
++        case '4': openYandexNavigator({ origin: payload.origin, destination: payload.destination, via: [] }); break;
+         default: window.open(payload.googleUrl, '_blank');
+       }
+     }
+ 
+     function buildSharePayload(route) {
+@@
+-      const origin = pts[0];
+-      const destination = pts[pts.length - 1];
+-      const via = pts.slice(1, -1);
++      const origin = pts[0];
++      const destination = pts[pts.length - 1];
++      const via = pts.slice(1, -1);
+@@
+-      const navParams = new URLSearchParams({
+-        lat_from: origin[0].toFixed(6),
+-        lon_from: origin[1].toFixed(6),
+-        lat_to: destination[0].toFixed(6),
+-        lon_to: destination[1].toFixed(6),
+-      });
+-      const navigatorFallbackUrl = `yandexnavi://build_route_on_map?${navParams.toString()}`;
+-      let navigatorViaUrl = '';
+-      if (via.length) {
+-        const viaParam = via
+-          .map((point) => `${Number(point[0]).toFixed(6)},${Number(point[1]).toFixed(6)}`)
+-          .join(';');
+-        const viaParams = new URLSearchParams(navParams);
+-        viaParams.set('via', viaParam); // CHANGE: Яндекс.Навигатор принимает via=lat,lon;lat,lon
+-        navigatorViaUrl = `yandexnavi://build_route_on_map?${viaParams.toString()}`;
+-      }
++      // Навигатор теперь открываем через openYandexNavigator (ниже)
+@@
+-      const navLines = navigatorViaUrl
+-        ? [`Яндекс.Навигатор (via): ${navigatorViaUrl}`, `Яндекс.Навигатор (A→B): ${navigatorFallbackUrl}`]
+-        : [`Яндекс.Навигатор: ${navigatorFallbackUrl}`];
++      const navLines = [`Яндекс.Навигатор: откройте из мобильного меню «Поделиться → 3/4»`];
+@@
+-      return { googleUrl, yandexUrl, navigatorViaUrl, navigatorFallbackUrl, shareText, whatsApp };
++      return { googleUrl, yandexUrl, shareText, whatsApp, origin, destination, via };
+     }
+ 
++    // ПЛАТФОРМОЗАВИСИМОЕ ОТКРЫТИЕ Яндекс.Навигатора с fallback’ами
++    function openYandexNavigator({ origin, destination, via = [] }) {
++      if (!Array.isArray(origin) || !Array.isArray(destination)) return;
++      const ua = navigator.userAgent || '';
++      const onAndroid = /Android/i.test(ua);
++      const oniOS = /iPhone|iPad|iPod/i.test(ua);
++
++      const toFixed = (p) => `${Number(p[0]).toFixed(6)},${Number(p[1]).toFixed(6)}`;
++      const baseParams = new URLSearchParams({
++        lat_from: Number(origin[0]).toFixed(6),
++        lon_from: Number(origin[1]).toFixed(6),
++        lat_to:   Number(destination[0]).toFixed(6),
++        lon_to:   Number(destination[1]).toFixed(6),
++      });
++      if (via && via.length) {
++        baseParams.set('via', via.map(toFixed).join(';'));
++      }
++
++      const schemeUrl = `yandexnavi://build_route_on_map?${baseParams.toString()}`;
++      const webFallback = (() => {
++        const all = [origin, ...via, destination].map(toFixed).join('~');
++        return `https://yandex.ru/maps/?rtext=${all}&rtt=auto`;
++      })();
++
++      if (onAndroid) {
++        // Chrome/Android: intent:// с fallback в Google Play
++        const intent = `intent://build_route_on_map?${baseParams.toString()}#Intent;scheme=yandexnavi;package=ru.yandex.yandexnavi;end`;
++        try { window.location.href = intent; } catch (_) {}
++        setTimeout(() => {
++          // Если не открылось — в Google Play
++          window.location.href = 'https://play.google.com/store/apps/details?id=ru.yandex.yandexnavi';
++        }, 1200);
++        return;
++      }
++
++      if (oniOS) {
++        // iOS: пробуем схему, затем App Store
++        const appStore = 'https://apps.apple.com/ru/app/yandex-navigator/id474500851';
++        // Навигатор открывается только по жесту пользователя — вызывать из click/confirm.
++        window.location.href = schemeUrl;
++        setTimeout(() => { window.location.href = appStore; }, 1200);
++        return;
++      }
++
++      // Десктоп: сразу в веб-карты
++      window.open(webFallback, '_blank');
++    }
 
       const answer = window.prompt(
         'Куда отправить?\n1 — WhatsApp\n2 — Скопировать ссылки\n3 — Открыть в Навигаторе (с via)\n4 — Открыть в Навигаторе (A→B)\nОтмена — открыть Google Maps.',
