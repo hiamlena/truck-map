@@ -901,6 +901,58 @@ async function getWaypointFromNote(note) {
       const bounds=state.routeLine.geometry.getBounds();
       if(bounds) state.map.setBounds(bounds, {checkZoomRange:true, zoomMargin:[40,240,240,40]});
     }
+    // === Полная очистка маршрута и состояния ===
+function clearRoute(){
+  try {
+    // убрать основную линию
+    if (state.routeLine && state.map) {
+      state.map.geoObjects.remove(state.routeLine);
+    }
+    state.routeLine = null;
+
+    // убрать маркеры A, B, via (маршрутные)
+    (state.routeMarkers || []).forEach(m => {
+      try { state.map.geoObjects.remove(m); } catch(_){}
+    });
+    state.routeMarkers = [];
+
+    // убрать линию "объезд" (пунктир)
+    clearDetour();
+
+    // убрать ручной предпросмотр и маркеры via (ручной объезд)
+    (state.manualViaMarkers || []).forEach(m => {
+      try { state.map.geoObjects.remove(m); } catch(_){}
+    });
+    state.manualViaMarkers = [];
+    state.manualVia = [];
+    if (state.manualPreview) {
+      try { state.map.geoObjects.remove(state.manualPreview); } catch(_){}
+      state.manualPreview = null;
+    }
+    // выключить режим ручного объезда и кнопки
+    if (state.manualDetour) {
+      state.manualDetour = false;
+      elements.manualDetourBtn.style.display = '';
+      elements.manualDoneBtn.style.display = 'none';
+      elements.manualClearBtn.style.display = 'none';
+    }
+
+    // сбросить зоны и пересечения
+    resetZoneSelections();
+    clearZoneIntersectionFlags();
+
+    // состояние маршрута
+    state.activeRouteKind = 'main';
+    state.routeData = null;
+    state.detourList = [];
+    state.recommendations = [];
+
+    // обновить UI рекомендаций
+    renderRecommendations();
+  } catch (e) {
+    console.warn('clearRoute error:', e);
+  }
+}
 
     // =======================
     // Шаринг / Навигатор
