@@ -330,7 +330,6 @@ if (!Array.prototype.at) {
     t=setTimeout(async()=>{ try{ if(typeof ymaps?.suggest==='function') await ymaps.suggest(q); }catch(_){} },250);
   });
 }
-let _netAlertShown = false;
 
 // Ловим необработанные промисы (с анти-спамом)
 window.addEventListener('unhandledrejection', (e) => {
