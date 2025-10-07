@@ -332,8 +332,6 @@ if (!Array.prototype.at) {
 }
 let _netAlertShown = false;
 
-let _netAlertShown = false;
-
 // Ловим необработанные промисы (с анти-спамом)
 window.addEventListener('unhandledrejection', (e) => {
   console.warn('Unhandled promise rejection:', e.reason);
@@ -343,7 +341,7 @@ window.addEventListener('unhandledrejection', (e) => {
     if (msg.includes('Failed to fetch') || msg.includes('инициализировались')) {
       _netAlertShown = true;
       alert('Похоже, сеть или сервис недоступны. Попробуйте ещё раз, проверьте интернет или используйте «Поделиться».');
-      setTimeout(()=>{ _netAlertShown = false; }, 8000);
+      setTimeout(() => { _netAlertShown = false; }, 8000);
     }
   } catch (_) {}
 });
