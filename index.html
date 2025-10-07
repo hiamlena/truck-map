@@ -127,6 +127,16 @@
 
   <script>
   (() => {
+
+    // ——— Полифилл для Array.prototype.at (старые Safari) ———
+if (!Array.prototype.at) {
+  Array.prototype.at = function(n){
+    n = Math.trunc(n) || 0;
+    if (n < 0) n += this.length;
+    return this[n];
+  };
+}
+
     // --------- Состояние и элементы
     const state = {
       map: null, routeLine: null, detourLine: null, routeMarkers: [],
@@ -170,6 +180,7 @@
     // Глобальные флаги (инициализированы ОДИН раз в рамках IIFE)
     let tollWarned = false;
     let loadingCounter = 0;
+    
 
     // Зоны (ID/кеш)
     let __zoneCounter = 0;
@@ -310,15 +321,72 @@
 
     // ----- Подсказки адресов (мягкие)
     function wireSuggestSafe(inputEl){
-      inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('buildRouteBtn')?.click(); }});
-      let t=null;
-      inputEl.addEventListener('input', ()=>{
-        clearTimeout(t);
-        const q=inputEl.value.trim();
-        if(q.length<3) return;
-        t=setTimeout(async()=>{ try{ if(typeof ymaps?.suggest==='function') await ymaps.suggest(q); }catch(_){} },250);
-      });
+  inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('buildRouteBtn')?.click(); }});
+  let t=null;
+  inputEl.addEventListener('input', ()=>{
+    clearTimeout(t);
+    const q=inputEl.value.trim();
+    if(q.length<3) return;
+    t=setTimeout(async()=>{ try{ if(typeof ymaps?.suggest==='function') await ymaps.suggest(q); }catch(_){} },250);
+  });
+}
+let _netAlertShown = false;
+
+let _netAlertShown = false;
+
+// Ловим необработанные промисы (с анти-спамом)
+window.addEventListener('unhandledrejection', (e) => {
+  console.warn('Unhandled promise rejection:', e.reason);
+  try {
+    if (_netAlertShown) return;
+    const msg = String(e.reason?.message || e.reason || '');
+    if (msg.includes('Failed to fetch') || msg.includes('инициализировались')) {
+      _netAlertShown = true;
+      alert('Похоже, сеть или сервис недоступны. Попробуйте ещё раз, проверьте интернет или используйте «Поделиться».');
+      setTimeout(()=>{ _netAlertShown = false; }, 8000);
     }
+  } catch (_) {}
+});
+
+// Ловим прочие ошибки окна
+window.addEventListener('error', (e) => {
+  console.warn('Window error:', e.error || e.message);
+});
+
+
+// ——— Глобальные ловушки, чтобы не терять ошибки ———
+window.addEventListener('unhandledrejection', (e) => {
+  console.warn('Unhandled promise rejection:', e.reason);
+  try{
+    if (String(e.reason?.message || e.reason || '').includes('Failed to fetch') ||
+        String(e.reason?.message || e.reason || '').includes('инициализировались')) {
+      alert('Похоже, сеть или сервис недоступны. Попробуйте ещё раз, проверьте интернет или используйте кнопки «Поделиться», чтобы открыть маршрут в Google/Яндекс.');
+    }
+  }catch(_){}
+});
+window.addEventListener('error', (e) => {
+  console.warn('Window error:', e.error || e.message);
+});
+
+let _netAlertShown = false;
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.warn('Unhandled promise rejection:', e.reason);
+  try{
+    if (_netAlertShown) return;
+    const msg = String(e.reason?.message || e.reason || '');
+    if (msg.includes('Failed to fetch') || msg.includes('инициализировались')) {
+      _netAlertShown = true;
+      alert('Похоже, сеть или сервис недоступны. Попробуйте ещё раз, проверьте интернет или используйте «Поделиться».');
+      setTimeout(()=>{ _netAlertShown = false; }, 8000); // через время снова разрешим
+    }
+  }catch(_){}
+});
+
+window.addEventListener('error', (e) => {
+  console.warn('Window error:', e.error || e.message);
+});
+
 
     // =======================
     // Зоны (рамки/Платон)
@@ -518,16 +586,51 @@
       });
       return out;
     }
-    function findNearestPointOnPath(point, path){
-      if(!Array.isArray(path) || path.length<2) return null;
-      let best=null;
-      for(let i=0;i<path.length-1;i++){
-        const info=pointToSegmentInfo(point, path[i], path[i+1]);
-        if(!best || info.distance<best.distance){ best={ point:info.point, closestPoint:info.point, segmentIndex:i, distance:info.distance }; }
-      }
-      return best;
+   function findNearestPointOnPath(point, path){
+  if (!Array.isArray(path) || path.length < 2) return null;
+  let best = null;
+  for (let i = 0; i < path.length - 1; i++) {
+    const info = pointToSegmentInfo(point, path[i], path[i + 1]);
+    if (!best || info.distance < best.distance) {
+      best = { point: info.point, closestPoint: info.point, segmentIndex: i, distance: info.distance };
     }
+  }
+  return best;
+}
 
+// Минимальная дистанция от точки до ломаной path (в метрах)
+function minDistanceToPathMeters(point, path){
+  if (!Array.isArray(path) || path.length < 2) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const info = pointToSegmentInfo(point, path[i], path[i + 1]);
+    if (info.distance < best) best = info.distance;
+  }
+  return best;
+}
+
+// BBOX маршрута
+function pathBBox(path){
+  let minLat =  90, maxLat = -90, minLon =  180, maxLon = -180;
+  for (const [lat, lon] of (path || [])) {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  }
+  return { minLat, maxLat, minLon, maxLon };
+}
+
+// Расширение BBOX на km километров (грубо 1° ≈ 111 км)
+function expandBBox(bbox, km){
+  const d = km / 111;
+  return {
+    minLat: bbox.minLat - d,
+    maxLat: bbox.maxLat + d,
+    minLon: bbox.minLon - d,
+    maxLon: bbox.maxLon + d,
+  };
+}
     // =======================
     // Геокодинг/парсинг ввода
     // =======================
@@ -561,169 +664,269 @@
       return [lat,lon];
     }
 
-    // =======================
-    // Маршрутизация (OSRM)
-    // =======================
-    async function buildRoute(options={}){
-      showLoading();
-      try{
-        const fromValue = options.from ?? elements.fromInput.value.trim();
-        const toValue   = options.to   ?? elements.toInput.value.trim();
-        if(!fromValue || !toValue){ alert('Укажите точки начала и конца маршрута.'); return; }
-        const from = await resolveInput(fromValue);
-        const to   = await resolveInput(toValue);
-        if(!from || !to){ alert('Не удалось определить координаты.'); return; }
+ // =======================
+// Маршрутизация (OSRM)
+// =======================
+async function buildRoute(options = {}) {
+  showLoading();
+  try {
+    // 1) читаем ввод
+    const fromValue = options.from ?? elements.fromInput.value.trim();
+    const toValue   = options.to   ?? elements.toInput.value.trim();
+    if (!fromValue || !toValue) { alert('Укажите точки начала и конца маршрута.'); return; }
 
-        const viaRaw = Array.isArray(options.via)? options.via : [];
-        const via=[]; for(const v of viaRaw){ const p=await resolveInput(v); if(p) via.push(p); }
+    const from = await resolveInput(fromValue);
+    const to   = await resolveInput(toValue);
+    if (!from || !to) { alert('Не удалось определить координаты.'); return; }
 
-        const coordsList = [from, ...via, to];
-        const routeData  = await requestRouteWithRetry(coordsList, Boolean(elements.tollToggle.checked), 2);
-        if(!routeData){ alert('Маршрут не найден.'); offerRouteFallback(from,to,new Error('OSRM пустой')); return; }
-
-        if(state.routeData) state.routeHistory.push(state.routeData);
-        state.routeData = {
-          coordsList, path:routeData.path, distance:routeData.distance, duration:routeData.duration,
-          steps: routeData.steps, intersections: detectIntersections(routeData.path),
-        };
-        markRouteIntersections(state.routeData.intersections||[]);
-        state.activeRouteKind = options.detour? 'detour' : 'main';
-
-        clearDetour();
-        if(!options.detour) resetZoneSelections();
-
-        renderRoute(routeData.path, coordsList);
-        if(options.detour) drawDetour(routeData.path);
-
-        updateRecommendations();
-        if(!options.detour) state.detourList = [];
-        return state.routeData;
-      }catch(e){ console.warn(e); alert(e?.message||'Не удалось построить маршрут.'); }
-      finally{ hideLoading(); }
+    // 2) via
+    const viaRaw = Array.isArray(options.via) ? options.via : [];
+    const via = [];
+    for (const v of viaRaw) {
+      const p = await resolveInput(v);
+      if (p) via.push(p);
     }
 
-    async function requestRouteWithRetry(coordsList, avoidToll, attempts=2){
-      let last=null;
-      for(let i=0;i<attempts;i++){
-        try{ return await requestRoute(coordsList, avoidToll); }
-        catch(e){ last=e; if(i<attempts-1) await delay(700); }
+    const coordsList = [from, ...via, to];
+
+    // 3) запрос маршрута (ОДИН раз)
+    const routeData = await requestRouteWithRetry(
+      coordsList,
+      Boolean(elements.tollToggle?.checked),
+      2
+    );
+    if (!routeData) {
+      alert('Маршрут не найден.');
+      offerRouteFallback(from, to, new Error('OSRM пустой'));
+      return;
+    }
+
+    // 4) сохраняем прошлый маршрут в историю ДО перезаписи текущего
+    if (state.routeData) {
+      state.routeHistory.push(state.routeData);
+      if (state.routeHistory.length > 10) state.routeHistory.shift(); // держим последние 10
+    }
+
+    // 5) обновляем текущее состояние
+    state.routeData = {
+      coordsList,
+      path: routeData.path,
+      distance: routeData.distance,
+      duration: routeData.duration,
+      steps: routeData.steps,
+      intersections: detectIntersections(routeData.path),
+    };
+    markRouteIntersections(state.routeData.intersections || []);
+    state.activeRouteKind = options.detour ? 'detour' : 'main';
+
+    // 6) очистка пунктира и (опционально) сброс выбранных зон
+    clearDetour();
+    if (!options.detour) resetZoneSelections();
+
+    // 7) рисуем основной маршрут; если это объезд — пунктиром показываем прошлый путь
+    const prevPath = options.detour
+      ? (state.routeHistory.at ? state.routeHistory.at(-1)?.path
+                               : state.routeHistory[state.routeHistory.length - 1]?.path)
+      : null;
+
+    renderRoute(routeData.path, coordsList);
+    if (options.detour && prevPath) {
+      drawDetour(prevPath);
+    }
+
+    // 8) рекомендации и возврат
+    updateRecommendations();
+    if (!options.detour) state.detourList = [];
+    return state.routeData;
+
+  } catch (e) {
+    console.warn(e);
+    alert(e?.message || 'Не удалось построить маршрут.');
+  } finally {
+    hideLoading();
+  }
+}
+    // =======================
+// OSRM: запрос маршрута с повтором
+// =======================
+async function requestRouteWithRetry(coordsList, avoidToll, attempts = 2) {
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await requestRoute(coordsList, avoidToll);
+    } catch (e) {
+      last = e;
+      if (i < attempts - 1) await delay(700);
+    }
+  }
+  throw last || new Error('Не удалось получить маршрут.');
+}
+
+async function requestRoute(coordsList, avoidToll) {
+  // Защита от слишком длинных URL (слишком много via)
+  const clamped = clampVia(coordsList, 25);
+
+  const points = clamped.map(c => `${c[1]},${c[0]}`).join(';');
+  const url = new URL(`https://router.project-osrm.org/route/v1/driving/${points}`);
+  url.searchParams.set('overview', 'full');
+  url.searchParams.set('geometries', 'geojson');
+  url.searchParams.set('steps', 'true');
+  if (avoidToll) url.searchParams.set('exclude', 'toll');
+
+  // Таймаут на сетевой запрос (чтобы не висло бесконечно)
+  const r = await fetchWithTimeout(url.toString(), 12000);
+  if (!r.ok) throw new Error('Сервис маршрутов временно недоступен.');
+
+  const data = await r.json();
+  if (!data.routes?.length) return null;
+
+  const route = data.routes[0];
+  const path = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+
+  const steps = [];
+  route.legs.forEach(leg =>
+    leg.steps.forEach(step => steps.push({
+      text: step.maneuver?.instruction || formatStep(step),
+      distance: step.distance,
+      duration: step.duration,
+      name: step.name || '',
+      maneuver: step.maneuver || null
+    }))
+  );
+
+  return { path, steps, distance: route.distance, duration: route.duration };
+}
+
+
+// =======================
+// ИИ-объезд (авто via)
+// =======================
+async function handleDetour(){
+  showLoading();
+  try{
+    if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
+
+    const base = state.routeData;
+    const ints = Array.isArray(base.intersections)? base.intersections : [];
+    const selectedZones = (state.detourList||[]).filter(Boolean);
+    const zones = selectedZones.length ? selectedZones : ints.map(h=>h.zone).filter(Boolean);
+    if(!zones.length){ alert('Зоны на маршруте не обнаружены.'); return; }
+
+    // 1) сначала пробуем вытащить явные "через <топоним>" из заметок
+    const notePoints = [];
+    const candidates  = [];
+
+    for (const zone of zones) {
+      const note = zone?.properties?.note || '';
+      const wp = await getWaypointFromNote(note, base.path);
+
+      if (Array.isArray(wp) && wp.length === 2) {
+        // защитимся от «одноимёнок»: если точка почти в зоне — игнорим
+        const tooClose = haversine(wp, zone.center) < Math.max(300, (zone.radius || 0) * 0.8);
+        if (!tooClose) {
+          const anchor = findNearestPointOnPath(wp, base.path);
+          notePoints.push({ point: wp, segmentIndex: anchor?.segmentIndex ?? 0 });
+          continue; // для этой зоны геометрию уже не считаем
+        }
       }
-      throw last||new Error('Не удалось получить маршрут.');
-    }
-    async function requestRoute(coordsList, avoidToll){
-      const points = coordsList.map(c=>`${c[1]},${c[0]}`).join(';');
-      const url = new URL(`https://router.project-osrm.org/route/v1/driving/${points}`);
-      url.searchParams.set('overview','full');
-      url.searchParams.set('geometries','geojson');
-      url.searchParams.set('steps','true');
-      if(avoidToll) url.searchParams.set('exclude','toll');
 
-      const r = await fetch(url.toString());
-      if(!r.ok) throw new Error('Сервис маршрутов временно недоступен.');
-      const data = await r.json();
-      if(!data.routes?.length) return null;
-      const route = data.routes[0];
-      const path = route.geometry.coordinates.map(([lon,lat])=>[lat,lon]);
-      const steps=[];
-      route.legs.forEach(leg=>leg.steps.forEach(step=>steps.push({
-        text: step.maneuver?.instruction || formatStep(step),
-        distance: step.distance, duration: step.duration, name: step.name||'', maneuver: step.maneuver||null
-      })));
-      return { path, steps, distance:route.distance, duration:route.duration };
+      // 2) fallback: геометрический объезд
+      const hit    = ints.find(x => x.zone === zone);
+      const anchor = hit || findNearestPointOnPath(zone.center, base.path);
+      if (!anchor || !Number.isFinite(anchor.segmentIndex)) continue;
+
+      const segA      = base.path[anchor.segmentIndex];
+      const segB      = base.path[anchor.segmentIndex + 1] || segA;
+      const basePoint = anchor.closestPoint || anchor.point || zone.center;
+      const offset    = Math.max((zone.radius || 400) * 1.3, 300);
+
+      const prefSide = parseNoteSide(note); // -1=left, +1=right, 0=auto
+      const detour = buildDetourPointPref(basePoint, segA, segB, zone.center, offset, zone.radius || 0, prefSide);
+      if (!detour) continue;
+
+      const minGap = Math.max(300, (zone.radius || 0) * 0.7);
+      candidates.push({ point: detour, segmentIndex: anchor.segmentIndex, minGap });
     }
 
-    // =======================
-    // ИИ-объезд (авто via)
-    // =======================
-    async function handleDetour(){
-      showLoading();
-      try{
-        if(!state.routeData){ alert('Сначала постройте маршрут.'); return; }
-        const base = state.routeData;
-        const ints = Array.isArray(base.intersections)? base.intersections : [];
-        const selectedZones = (state.detourList||[]).filter(Boolean);
-        const zones = selectedZones.length? selectedZones : ints.map(h=>h.zone).filter(Boolean);
-        if(!zones.length){ alert('Зоны на маршруте не обнаружены.'); return; }
-
-// сначала пробуем извлечь из примечаний реальные "через <топоним>"
-const notePoints = [];
-const candidates = [];
-
-for (const zone of zones) {
-  const note = zone?.properties?.note || '';
-  const wp = await getWaypointFromNote(note);
-
-  if (Array.isArray(wp) && wp.length === 2) {
-    // защитимся от дурацких совпадений — если точка почти в самой зоне, игнорим
-    const tooClose = haversine(wp, zone.center) < Math.max(300, (zone.radius || 0) * 0.8);
-    if (!tooClose) {
-      // определим примерное место вдоль маршрута, чтобы потом отсортировать по порядку
-      const anchor = findNearestPointOnPath(wp, base.path);
-      notePoints.push({ point: wp, segmentIndex: anchor?.segmentIndex ?? 0 });
-      continue; // для этой зоны больше ничего не считаем — приоритет явного "через"
+    // 3) собираем via
+    let via = [];
+    if (notePoints.length) {
+      // по порядку вдоль маршрута + дедуп ближе 250 м
+      notePoints.sort((a,b)=> (a.segmentIndex||0) - (b.segmentIndex||0));
+      const uniq = [];
+      for (const p of notePoints) {
+        if (!uniq.some(u => haversine(u, p.point) < 250)) uniq.push(p.point);
+      }
+      via = uniq.slice(0, 6);
+    } else {
+      const filtered = filterDetourCandidates(candidates);
+      const safeSelectEvenly = (typeof selectEvenly === 'function')
+        ? selectEvenly
+        : (pts, k) => {
+            try {
+              if (!Array.isArray(pts) || !pts.length) return [];
+              const n = Math.max(0, Math.min((k|0), pts.length));
+              if (n <= 0) return [];
+              if (n >= pts.length) return pts.slice();
+              const out = [];
+              for (let i = 0; i < n; i++) {
+                const idx = Math.round((i * (pts.length - 1)) / (n - 1));
+                if (!out.length || out[out.length - 1] !== pts[idx]) out.push(pts[idx]);
+              }
+              return out;
+            } catch { return pts || []; }
+          };
+      via = safeSelectEvenly(filtered.map(c=>c.point), Math.min(6, filtered.length));
     }
+
+    if (!via.length) {
+      alert('Не удалось вычислить точки объезда. Воспользуйтесь «Ручной объезд».');
+      return;
+    }
+
+    // 4) финальная чистка via (дубликаты ближе 200 м)
+    {
+      const uniq = [];
+      for (const p of via) {
+        if (!uniq.some(u => haversine(u, p) < 200)) uniq.push(p);
+      }
+      via = uniq.slice(0, 6);
+    }
+
+    // 5) preflight-проверка (чтобы не получить 12 000 км)
+    const start  = base.coordsList[0];
+    const finish = base.coordsList[base.coordsList.length - 1];
+
+    const coordsForTrial = [start, ...via, finish];
+    const trial = await requestRouteWithRetry(
+      coordsForTrial,
+      Boolean(elements.tollToggle?.checked),
+      2
+    );
+
+    if (!trial) {
+      alert('Объезд не найден. Попробуйте «Ручной объезд».');
+      return;
+    }
+
+    const baseDistance = base?.distance ?? state.routeData?.distance ?? 0;
+    if (baseDistance > 0 && trial.distance > baseDistance * 1.6) {
+      alert('ИИ-объезд получился слишком длинным. Попробуйте «Ручной объезд» или скорректируйте зоны/подсказки.');
+      return;
+    }
+
+    // 6) строим боевой маршрут с via
+    await buildRoute({ from: start, to: finish, via, detour: true });
+
+  } catch (e) {
+    console.warn('Ошибка объезда', e);
+    alert('Не удалось построить альтернативный маршрут.');
+    clearDetour();
+    state.activeRouteKind='main';
+  } finally {
+    hideLoading();
   }
-
-  // иначе — старый «геометрический» подход
-  const hit = ints.find(x => x.zone === zone);
-  const anchor = hit || findNearestPointOnPath(zone.center, base.path);
-  if (!anchor || !Number.isFinite(anchor.segmentIndex)) continue;
-  const segA = base.path[anchor.segmentIndex];
-  const segB = base.path[anchor.segmentIndex + 1] || segA;
-  const basePoint = anchor.closestPoint || anchor.point || zone.center;
-  const offset = Math.max((zone.radius || 400) * 1.3, 300);
-
-  const prefSide = parseNoteSide(note); // -1=left, +1=right, 0=auto
-  const detour = buildDetourPointPref(basePoint, segA, segB, zone.center, offset, zone.radius || 0, prefSide);
-  if (!detour) continue;
-  const minGap = Math.max(300, (zone.radius || 0) * 0.7);
-  candidates.push({ point: detour, segmentIndex: anchor.segmentIndex, minGap });
 }
-
-
-    // если нашлись явные "через <город>" — используем ИХ (в порядке вдоль маршрута), а не геометрию
-let via = [];
-if (notePoints.length) {
-  // сортируем по segmentIndex, убираем дубликаты ближе 250 м
-  notePoints.sort((a,b)=> (a.segmentIndex||0) - (b.segmentIndex||0));
-  const uniq = [];
-  for (const p of notePoints) {
-    if (!uniq.some(u => haversine(u, p.point) < 250)) uniq.push(p.point);
-  }
-  via = uniq.slice(0, 6);
-} else {
-  const filtered = filterDetourCandidates(candidates);
-  const safeSelectEvenly = (typeof selectEvenly === 'function')
-    ? selectEvenly
-    : (pts, k) => {
-        try {
-          if (!Array.isArray(pts) || !pts.length) return [];
-          const n = Math.max(0, Math.min((k|0), pts.length));
-          if (n <= 0) return [];
-          if (n >= pts.length) return pts.slice();
-          const out = [];
-          for (let i = 0; i < n; i++) {
-            const idx = Math.round((i * (pts.length - 1)) / (n - 1));
-            if (!out.length || out[out.length - 1] !== pts[idx]) out.push(pts[idx]);
-          }
-          return out;
-        } catch { return pts || []; }
-      };
-  via = safeSelectEvenly(filtered.map(c=>c.point), Math.min(6, filtered.length));
-}
-
-if (!via.length) {
-  alert('Не удалось вычислить точки объезда. Воспользуйтесь «Ручной объезд».');
-  return;
-}
-
-
-        const start = base.coordsList[0];
-        const finish= base.coordsList[base.coordsList.length-1];
-        await buildRoute({ from:start, to:finish, via, detour:true });
-      }catch(e){ console.warn('Ошибка объезда', e); alert('Не удалось построить альтернативный маршрут.'); clearDetour(); state.activeRouteKind='main'; }
-      finally{ hideLoading(); }
-    }
 
     function parseNoteSide(note){
       const n = (note||'').toLowerCase();
@@ -731,35 +934,64 @@ if (!via.length) {
       if(n.includes('справа')) return +1;
       return 0;
     }
-    // Извлечь via-точку из текста вида "Объезд через Новомосковск" (или "через ...")
-// Возвращает координаты [lat, lon] или null. Геокодим 1 раз (кеш noteWaypointCache).
-async function getWaypointFromNote(note) {
+// Извлечь via-точку из текста вида "Объезд через Новомосковск" (или "через ...").
+// Возвращает [lat, lon] или null. Геокодим в пределах bbox вокруг маршрута и выбираем
+// ближайшую к текущему пути точку (чтобы не улетать через «одноимённые» города).
+async function getWaypointFromNote(note, basePath) {
   try {
     if (!note) return null;
+
+    // ищем шаблон "через <топоним...>"
     const m = /через\s+([A-Za-zА-Яа-яЁё .,\-–—]+)/i.exec(String(note));
     if (!m) return null;
-    // берем первое название до запятой/длинного тире
+
     let place = m[1].split(/[,\-–—]/)[0].trim();
     if (!place) return null;
 
-    if (noteWaypointCache.has(place)) return noteWaypointCache.get(place);
+    // bbox вокруг маршрута (+/- 250 км) — грубое ограничение области поиска
+    const bbox = expandBBox(pathBBox(basePath || []), 250); // ~250 км
+    const cacheKey = `${place}|${bbox.minLat.toFixed(2)},${bbox.minLon.toFixed(2)},${bbox.maxLat.toFixed(2)},${bbox.maxLon.toFixed(2)}`;
+    if (noteWaypointCache.has(cacheKey)) return noteWaypointCache.get(cacheKey);
 
-    // пробуем геокодить как населённый пункт в РФ (без жёсткой привязки — чтобы работало и вне РФ)
-    let coords = null;
+    let best = null;
+
     if (typeof ymaps?.geocode === 'function') {
-      const res = await ymaps.geocode(place, { results: 1 });
+      const boundedBy = [[bbox.minLat, bbox.minLon], [bbox.maxLat, bbox.maxLon]];
+      const res = await ymaps.geocode(place, {
+        results: 5,
+        boundedBy,
+        strictBounds: false, // разрешаем слегка выходить за bbox, но потом отфильтруем
+        kind: 'locality',
+      });
+
       if (res && res.geoObjects.getLength()) {
-        const c = res.geoObjects.get(0).geometry.getCoordinates();
-        if (Array.isArray(c) && c.length === 2) coords = c;
+        res.geoObjects.each(go => {
+          try {
+            const c = go.geometry.getCoordinates(); // [lat, lon]
+            if (!Array.isArray(c) || c.length !== 2) return;
+
+            // отбрасываем кандидатов далеко от маршрута (> 250 км)
+            const dPath = minDistanceToPathMeters(c, basePath || []);
+            if (dPath > 250000) return;
+
+            // берём ближайшего к пути
+            if (!best || dPath < best.dPath) {
+              best = { coord: c, dPath };
+            }
+          } catch {}
+        });
       }
     }
-    noteWaypointCache.set(place, coords || null);
-    return coords;
+
+    const coord = best?.coord || null;
+    noteWaypointCache.set(cacheKey, coord);
+    return coord;
   } catch (e) {
     console.warn('getWaypointFromNote error:', e);
     return null;
   }
 }
+
 
     function buildDetourPointPref(basePoint, segA, segB, zoneCenter, distance, zoneRadius, sidePref){
       if(!Array.isArray(basePoint)||basePoint.length!==2) return null;
@@ -1105,6 +1337,45 @@ function clearRoute(){
         if(elements.mapModeSelect) elements.mapModeSelect.value=state.mapMode;
       }
     }
+// =======================
+// Ограничение количества via и таймауты сетевых запросов
+// =======================
+
+// Обрезает список точек: старт + via + финиш ≤ maxPts (защита от очень длинных URL / 414)
+function clampVia(fullList, maxPts = 25) {
+  try {
+    const list = Array.isArray(fullList) ? fullList : [];
+    if (list.length <= maxPts) return list.slice();
+
+    const start  = list[0];
+    const finish = list[list.length - 1];
+    const inner  = list.slice(1, -1); // только via
+
+    const keep = Math.max(0, maxPts - 2);
+    if (keep <= 0) return [start, finish];
+
+    // Равномерно выбираем keep точек из inner
+    const out = [];
+    for (let i = 0; i < keep; i++) {
+      const idx = Math.round((i * (inner.length - 1)) / (keep - 1 || 1));
+      out.push(inner[idx]);
+    }
+    return [start, ...out, finish];
+  } catch {
+    return fullList; // на всякий случай — не ломаем поток
+  }
+}
+
+// fetch с таймаутом на случай подвисаний сети/OSRM
+async function fetchWithTimeout(url, ms = 12000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 
     // =======================
     // Утилиты
