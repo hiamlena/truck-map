@@ -48,12 +48,33 @@
     .actions button.violet{background:#6d28d9}
     .actions button:active{transform:translateY(1px);box-shadow:none}
 
-    .balloon-actions{margin-top:8px;display:flex;gap:8px}
-    .balloon-actions button{padding:8px 10px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
     .balloon-note{margin-top:6px;font-size:13px;opacity:.85}
 
     @media (min-width:768px){
       .sheet{width:min(360px,32vw);left:auto;right:24px;bottom:32px;border-radius:26px}
+    }
+
+    @media (max-width:540px){
+      .sheet{
+        max-height:32vh;
+        padding:10px 12px calc(16px + env(safe-area-inset-bottom));
+        gap:8px;
+      }
+      .field label{font-size:12px;}
+      .field input{padding:10px 12px;font-size:14px;}
+      .toggles{grid-template-columns:1fr 1fr;gap:6px;font-size:12px;}
+      .toggles label{padding:6px 8px;}
+      .actions{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:6px;
+      }
+      .actions button{
+        min-height:38px;
+        font-size:13px;
+        padding:8px;
+        border-radius:10px;
+      }
+      #legend.panel, #recommendations.panel{opacity:0;pointer-events:none;}
     }
   </style>
 
@@ -69,7 +90,7 @@
   <button type="button" id="recsToggleBtn" style="position:fixed;left:160px;top:8px;z-index:1300;">Скрыть рекомендации</button>
 
   <!-- Рекомендации -->
-  <section id="recommendations" class="panel">
+  <section id="recommendations" class="panel hidden">
     <h2>Рекомендации</h2>
     <ul id="recommendationsList">
       <li>Постройте маршрут, чтобы получить рекомендации по рейсу.</li>
@@ -77,7 +98,7 @@
   </section>
 
   <!-- Легенда -->
-  <aside id="legend" class="panel">
+  <aside id="legend" class="panel hidden">
     <h2>Легенда</h2>
     <div class="legend-item"><span class="legend-icon red"></span> <span>Весовые рамки</span></div>
     <div class="legend-item"><span class="legend-icon orange"></span> <span>Платон</span></div>
@@ -458,9 +479,7 @@ window.addEventListener('error', (e) => {
       if(p.road) roadParts.push(escapeHtml(p.road));
       if(p.km) roadParts.push('км ' + escapeHtml(String(p.km)));
       if(roadParts.length) lines.push(roadParts.join(', '));
-      if(p.note) lines.push(`<div class="balloon-note">Объезд: ${escapeHtml(p.note)}</div>`);
-      const btnText = zone.__selected ? 'Снять объезд' : 'Объезд';
-      lines.push(`<div class="balloon-actions"><button id="detourBtn_${zone.__id}" type="button">${btnText}</button></div>`);
+      if(p.note) lines.push(`<div class="balloon-note">Объезд через ${escapeHtml(p.note)}</div>`);
       return lines.join('<br/>');
     }
 
@@ -488,25 +507,6 @@ window.addEventListener('error', (e) => {
 
           zone.circle.events.add('click', ()=>{ try{ zone.circle.balloon.open(); }catch(_){ zone.placemark?.balloon?.open(); } });
           zone.placemark.events.add('click', ()=>{ zone.placemark.balloon.open(); });
-
-          const attach = (geo, z) => geo.events.add('balloonopen', () => {
-            let attempts = 0;
-            const tryBind = () => {
-              try{
-                const btn = document.getElementById(`detourBtn_${z.__id}`);
-                if (btn) {
-                  btn.onclick = () => {
-                    try { toggleZoneDetour(z); handleDetour(); } catch(err){ console.warn('Detour click error:', err); }
-                  };
-                } else if (attempts < 5) {
-                  attempts += 1; setTimeout(tryBind, 70);
-                }
-              }catch(e){ console.warn('attach error:', e); }
-            };
-            tryBind();
-          });
-          attach(zone.placemark, zone);
-          attach(zone.circle, zone);
 
           zone.rendered = true;
         }else if(shouldRender && zone.rendered){
@@ -1318,11 +1318,11 @@ function clearRoute(){
     }
     function restoreUI(){
       try{
+        elements.fromInput.value='';
+        elements.toInput.value='';
         const raw=localStorage.getItem('truckMapSettings');
         if(!raw){ elements.weightToggle.checked=true; if(elements.mapModeSelect) elements.mapModeSelect.value=state.mapMode; return; }
         const d=JSON.parse(raw);
-        if(typeof d.from==='string') elements.fromInput.value=d.from;
-        if(typeof d.to==='string') elements.toInput.value=d.to;
         elements.weightToggle.checked = d.weight!==undefined? d.weight : true;
         if(typeof d.platon==='boolean') elements.platonToggle.checked=d.platon;
         if(typeof d.toll==='boolean') elements.tollToggle.checked=d.toll;
