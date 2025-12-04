@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trans-Time</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0f1115" />
+  <link rel="stylesheet" href="./assets/css/style.css" />
+  <script type="module" src="./errors.js"></script>
+  <style>
+    :root {
+      --h: 56px;
+      --input: #fff;
+      --bg: #f8f9fa;
+      --text: #111;
+      --border: #ddd;
+      --accent: #16a34a;
+      --accent-hover: #15803d;
+      --section-bg: #fff;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+
+    .tt-header {
+      height: var(--h);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      background: #000;
+      color: #fff;
+      font-weight: 600;
+      font-size: 16px;
+      position: relative;
+      z-index: 1000000;
+    }
+
+    .tt-layout {
+      display: flex;
+      height: calc(100vh - var(--h));
+      position: relative;
+    }
+
+    /* 🔥 ПРИНУДИТЕЛЬНОЕ ПОЗИЦИОНИРОВАНИЕ ПАНЕЛИ НА ВЕРХ */
+    .tt-panel {
+      position: relative !important;
+      z-index: 1000000 !important;
+      width: 300px !important;
+      max-width: 100% !important;
+      padding: 16px !important;
+      background: #ffffff !important;
+      overflow-y: auto !important;
+      border-right: 1px solid #ddd !important;
+      box-shadow: 1px 0 12px rgba(0, 0, 0, 0.12) !important;
+      pointer-events: auto !important;
+      background-color: white !important;
+      will-change: transform;
+    }
+
+    /* ВСЁ ВНУТРИ ПАНЕЛИ — ТОЖЕ НА ВЕРХ */
+    .tt-panel *,
+    .tt-panel *::before,
+    .tt-panel *::after {
+      position: relative !important;
+      z-index: 1000000 !important;
+      pointer-events: auto !important;
+    }
+
+    /* 🔴 ОТЛАДКА: ПОКАЖИ РАМКУ, ЧТОБЫ ВИДЕТЬ ПАНЕЛЬ */
+    .tt-panel {
+      outline: 3px solid #f00 !important;
+      outline-offset: -3px;
+    }
+
+    .tt-section {
+      margin-bottom: 16px;
+    }
+
+    .tt-veh {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tt-chip {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .tt-chip input {
+      display: none;
+    }
+
+    .tt-chip input:checked ~ * {
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .tt-input {
+      width: 100%;
+      height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--input);
+      font-size: 16px;
+    }
+
+    .tt-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .tt-btn {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--input);
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tt-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .tt-btn-primary {
+      background: var(--accent);
+      color: white;
+      font-weight: 500;
+      border-color: transparent;
+    }
+
+    .tt-btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .tt-btn-primary:disabled {
+      background: #ccc;
+      border-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    /* Раскрывающиеся блоки */
+    .tt-details > summary {
+      list-style: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent);
+      padding: 6px 0;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .tt-details > summary::after {
+      content: ' ▼';
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
+
+    .tt-details[open] > summary::after {
+      content: ' ▲';
+    }
+
+    .tt-details > div {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .tt-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .tt-toggle span {
+      flex: 1;
+    }
+
+    .tt-actions-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tt-actions-row .tt-btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .tt-saved-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .tt-note {
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* Адаптив */
+    @media (max-width: 768px) {
+      .tt-panel {
+        width: 100%;
+        border-right: none;
+        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+      }
+      .tt-layout {
+        flex-direction: column;
+      }
+    }
+
+    /* Карта */
+    .tt-map-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #e0e0e0;
+      z-index: 1;
+    }
+
+    .tt-map {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #routeList {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1001;
+      max-height: 240px;
+      overflow-y: auto;
+      min-width: 180px;
+      padding: 8px 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .tt-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #333;
+      border: 1px solid var(--border);
+      z-index: 1001;
+    }
+
+    .tt-legend-item {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    .legend-active { background: var(--accent); }
+    .legend-alt    { background: #3b82f6; }
+    .legend-frames { background: #8b5cf6; }
+  </style>
+</head>
+<body>
+  <header class="tt-header">Trans-Time</header>
+
+  <main class="tt-layout">
+    <!-- Левая панель -->
+    <section class="tt-panel">
+      <!-- Тип ТС -->
+      <div class="tt-section">
+        <div class="tt-veh">
+          <label class="tt-chip">
+            <input type="radio" name="veh" value="car" />
+            <span>Легковой</span>
+          </label>
+          <label class="tt-chip">
+            <input type="radio" name="veh" value="truck40" checked />
+            <span>≤ 40 т</span>
+          </label>
+          <label class="tt-chip">
+            <input type="radio" name="veh" value="truckHeavy" />
+            <span>> 40 т</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Откуда / Куда -->
+      <div class="tt-section">
+        <input id="from" class="tt-input" placeholder="Откуда" />
+        <input id="to" class="tt-input" placeholder="Куда" style="margin-top: 8px;" />
+      </div>
+
+      <!-- Кнопка "Выбрать машину" -->
+      <div class="tt-section">
+        <button id="truckSelectBtn" class="tt-btn">🚛 Выбрать машину</button>
+      </div>
+
+      <!-- Параметры ТС -->
+      <details class="tt-details" id="paramsDetails">
+        <summary>Параметры ТС (ручной ввод)</summary>
+        <div>
+          <div style="display: flex; gap: 8px;">
+            <label style="flex: 1;">
+              Вес, т
+              <input type="number" id="truckWeight" class="tt-input" value="40" step="0.1" min="0" max="100" style="margin-top: 4px;" />
+            </label>
+            <label style="flex: 1;">
+              Высота, м
+              <input type="number" id="truckHeight" class="tt-input" value="4.0" step="0.1" min="0" max="10" style="margin-top: 4px;" />
+            </label>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <label style="flex: 1;">
+              Ширина, м
+              <input type="number" id="truckWidth" class="tt-input" value="2.55" step="0.01" min="0" max="5" style="margin-top: 4px;" />
+            </label>
+            <label style="flex: 1;">
+              Длина, м
+              <input type="number" id="truckLength" class="tt-input" value="16" step="0.1" min="0" max="30" style="margin-top: 4px;" />
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <!-- Построить маршрут -->
+      <div class="tt-section">
+        <button id="buildBtn" class="tt-btn tt-btn-primary" disabled>Построить маршрут</button>
+      </div>
+
+      <!-- Точки по пути -->
+      <details class="tt-details">
+        <summary>Дополнительно</summary>
+        <div>
+          <div class="tt-actions-row">
+            <button id="waypointModeBtn" class="tt-btn">➕ Точки</button>
+            <button id="clearWaypoints" class="tt-btn">✕ Очистить</button>
+          </div>
+          <p class="tt-note">Нажмите на карте, чтобы добавить точку</p>
+        </div>
+      </details>
+
+      <!-- Слои -->
+      <details class="tt-details">
+        <summary>Слои карты</summary>
+        <div>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-traffic" checked><span>Пробки</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-events" checked><span>События</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-frames"><span>Весовые рамки</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-truck-allowed"><span>Разрешено</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-truck-conditional"><span>Ограничения</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-truck-forbidden"><span>Запрещено</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-federal"><span>Федеральные</span></label>
+          <label class="tt-toggle"><input type="checkbox" id="toggle-clearance"><span>Габариты</span></label>
+        </div>
+      </details>
+
+      <!-- Действия -->
+      <details class="tt-details" open>
+        <summary>Действия</summary>
+        <div>
+          <div class="tt-actions-row">
+            <button id="saveRouteBtn" class="tt-btn">💾</button>
+            <button id="shareRouteBtn" class="tt-btn">🔗</button>
+            <button id="openNavBtn" class="tt-btn">🧭</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Избранные -->
+      <div class="tt-section">
+        <div class="tt-saved-title">Избранные</div>
+        <ul id="savedRoutesList" class="tt-saved-routes"></ul>
+      </div>
+    </section>
+
+    <!-- Карта -->
+    <section class="tt-map-wrap">
+      <div id="map" class="tt-map"></div>
+      <div id="routeList"></div>
+      <div class="tt-legend">
+        <span class="tt-legend-item legend-active"></span><span>Акт.</span>
+        <span class="tt-legend-item legend-alt"></span><span>Альт.</span>
+        <span class="tt-legend-item legend-frames"></span><span>Рамки</span>
+      </div>
+    </section>
+  </main>
+
+  <!-- Конфиг и инициализация -->
+  <script src="./config.js"></script>
+  <script type="module" src="./assets/js/boot.js"></script>
+
+  <script>
+    // Сохранение состояния раскрытия деталей
+    const details = document.querySelectorAll('.tt-details');
+    details.forEach(el => {
+      const key = 'DETAILS_' + el.id;
+      if (!key.includes('DETAILS_')) return;
+
+      const saved = localStorage.getItem(key);
+      if (saved === 'true') el.setAttribute('open', '');
+      if (saved === 'false') el.removeAttribute('open');
+
+      el.addEventListener('toggle', () => {
+        localStorage.setItem(key, el.open);
+      });
+    });
+
+    // Кнопка выбора машины
+    $('#truckSelectBtn')?.addEventListener('click', () => {
+      toast('Скоро: выбери свою машину — параметры подставятся автоматически');
+    });
+
+    // Автозаполнение параметров
+    window.fillTruckParams = (w, h, wi, l) => {
+      $('#truckWeight')?.setAttribute('value', w);
+      $('#truckHeight')?.setAttribute('value', h);
+      $('#truckWidth')?.setAttribute('value', wi);
+      $('#truckLength')?.setAttribute('value', l);
+      toast(`Параметры обновлены: ${w}т, ${h}м`);
+    };
+
+    // 🔥 ПРИНУДИТЕЛЬНЫЙ ФИКС: каждые 100мс поднимаем панель
+    setInterval(() => {
+      const panel = document.querySelector('.tt-panel');
+      if (panel) {
+        panel.style.position = 'relative';
+        panel.style.zIndex = '1000000';
+        panel.style.pointerEvents = 'auto';
+        panel.style.willChange = 'transform';
+      }
+    }, 100);
+  </script>
+</body>
+</html>
